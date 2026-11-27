@@ -1,5 +1,14 @@
 export type Sex = 'female' | 'male'
 export type Meal = 'breakfast' | 'lunch' | 'dinner' | 'snack'
+export type DietType = 'omnivore' | 'lacto-ovo' | 'lacto' | 'ovo' | 'vegan'
+
+export const DIETS: { key: DietType; label: string; desc: string }[] = [
+  { key: 'lacto-ovo', label: '奶蛋素（蛋奶素）', desc: '不吃肉、魚、海鮮等動物；可吃蛋和奶製品' },
+  { key: 'lacto', label: '奶素', desc: '不吃肉類、海鮮和蛋；可吃奶製品' },
+  { key: 'ovo', label: '蛋素', desc: '不吃肉類、海鮮和奶；可吃蛋' },
+  { key: 'vegan', label: '全素／純素', desc: '不吃任何動物性食物，包含蛋、奶' },
+  { key: 'omnivore', label: '葷食', desc: '沒有飲食限制' }
+]
 
 export interface Profile {
   sex: Sex
@@ -8,6 +17,9 @@ export interface Profile {
   activity: number // TDEE 活動係數
   goalWeight: number
   weeklyLossKg: number
+  diet?: DietType
+  fiveSpices?: boolean // 是否吃五辛（蔥、蒜、韭、薤／蕎、興渠）
+  exerciseAddBack?: number // 運動消耗加回額度的比例 0–1
 }
 
 export interface WeightEntry {
@@ -28,6 +40,22 @@ export interface FoodItem extends Nutrients {
   name: string
   unit: string // 一份的描述，例如「1 個 (約 250g)」
   custom?: boolean
+  meat?: boolean // 含肉類／海鮮（素食模式會隱藏）
+  five?: boolean // 常含五辛
+  barcode?: string
+}
+
+export interface ExerciseEntry {
+  id: string
+  date: string
+  name: string
+  minutes: number
+  kcal: number
+}
+
+export interface Advice {
+  date: string
+  text: string
 }
 
 export interface LogEntry extends Nutrients {
@@ -47,6 +75,9 @@ export interface AppData {
   logs: LogEntry[]
   customFoods: FoodItem[]
   water: Record<string, number> // date -> ml
+  exercises: ExerciseEntry[]
+  advice: Advice[]
+  reminders?: { id: string; label: string; time: string; on: boolean }[]
 }
 
 export const MEALS: { key: Meal; label: string }[] = [

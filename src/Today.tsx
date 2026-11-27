@@ -3,6 +3,7 @@ import type { useStore } from './store'
 import { MEALS, type Meal } from './types'
 import { addDays, fmtDate, r1, sumLogs, targets, todayISO } from './util'
 import AddFood from './AddFood'
+import { streak } from './habits'
 
 type Store = ReturnType<typeof useStore>
 
@@ -27,9 +28,15 @@ export default function Today({ store, currentKg }: { store: Store; currentKg: n
   const t = targets(data.profile!, currentKg)
   const dayLogs = data.logs.filter((l) => l.date === date)
   const total = sumLogs(dayLogs)
-  const left = t.kcal - Math.round(total.kcal)
+  const exKcal = data.exercises.filter((e) => e.date === date).reduce((a, e) => a + e.kcal, 0)
+  const exBonus = Math.round(exKcal * (data.profile!.exerciseAddBack ?? 0.5))
+  const budget = t.kcal + exBonus
+  const left = budget - Math.round(total.kcal)
+  const st = streak(data)
+  const isToday = date === todayISO()
+  const noWeightToday = isToday && !data.weights.some((w) => w.date === date)
   const water = data.water[date] ?? 0
-  const pct = Math.min(1, total.kcal / t.kcal)
+  const pct = Math.min(1, total.kcal / budget)
   const R = 54
   const C = 2 * Math.PI * R
 
@@ -43,6 +50,12 @@ export default function Today({ store, currentKg }: { store: Store; currentKg: n
         <h1 onClick={() => setDate(todayISO())}>{date === todayISO() ? '今天' : fmtDate(date)}</h1>
         <button className="icon" onClick={() => setDate(addDays(date, 1))} disabled={date >= todayISO()} aria-label="後一天">›</button>
       </header>
+      {isToday && (st > 0 || noWeightToday) && (
+        <div className="nudges">
+          {st > 0 && <span className="pill">🔥 連續記錄 {st} 天</span>}
+          {noWeightToday && <span className="pill soft">⚖️ 今天還沒量體重</span>}
+        </div>
+      )}
 
       <section className="card summary">
         <svg viewBox="0 0 128 128" className="ring">
@@ -60,6 +73,7 @@ export default function Today({ store, currentKg }: { store: Store; currentKg: n
         </svg>
         <div className="summary-side">
           <div><small>目標</small><b>{t.kcal}</b></div>
+          {exBonus > 0 && <div><small>運動加回</small><b>+{exBonus}</b></div>}
           <div><small>已吃</small><b>{Math.round(total.kcal)}</b></div>
         </div>
       </section>

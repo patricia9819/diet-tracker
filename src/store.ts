@@ -3,7 +3,7 @@ import type { AppData } from './types'
 
 const KEY = 'diet-tracker-v1'
 
-const empty = (): AppData => ({ version: 1, profile: null, weights: [], logs: [], customFoods: [], water: {} })
+const empty = (): AppData => ({ version: 1, profile: null, weights: [], logs: [], customFoods: [], water: {}, exercises: [], advice: [] })
 
 function load(): AppData {
   try {
@@ -34,4 +34,13 @@ export function useStore() {
   const update = useCallback((fn: (d: AppData) => AppData) => setData((d) => fn(d)), [])
   const replace = useCallback((d: AppData) => setData({ ...empty(), ...d }), [])
   return { data, update, replace }
+}
+
+// API key 另外存放，不會被匯出到備份檔
+const KEY_API = 'diet-tracker-apikey'
+export const getApiKey = () => {
+  try { return localStorage.getItem(KEY_API) ?? '' } catch { return '' }
+}
+export const setApiKey = (k: string) => {
+  try { k ? localStorage.setItem(KEY_API, k) : localStorage.removeItem(KEY_API) } catch { /* ignore */ }
 }
