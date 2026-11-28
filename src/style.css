@@ -706,3 +706,13 @@ body:has(.garden-app) { background: var(--gp-bg); }
 .scene-tree { transform-origin: 10% 100%; animation: treeLeaves 7s ease-in-out infinite; }
 @keyframes treeLeaves { 0%, 100% { transform: rotate(-.35deg); } 50% { transform: rotate(.4deg); } }
 @media (prefers-reduced-motion: reduce) { .scene-tree { animation: none; } }
+
+/* 大樹：四叢葉子各自擺動（背景已補色，不會有疊影） */
+.scene-tree { transform-origin: 17% 92%; animation: leafA 5.2s ease-in-out infinite; will-change: transform; }
+.scene-tree.t0 { transform-origin: 4% 70%; animation: leafB 4.6s ease-in-out -1.1s infinite; }
+.scene-tree.t1 { transform-origin: 20% 60%; animation: leafA 5.4s ease-in-out -2.3s infinite; }
+.scene-tree.t2 { transform-origin: 34% 75%; animation: leafB 4.9s ease-in-out -.6s infinite; }
+.scene-tree.t3 { transform-origin: 40% 80%; animation: leafA 5.8s ease-in-out -3.4s infinite; }
+@keyframes leafA { 0%, 100% { transform: rotate(-1deg) translateX(-1px); } 50% { transform: rotate(1.1deg) translateX(2px); } }
+@keyframes leafB { 0%, 100% { transform: rotate(.9deg); } 45% { transform: rotate(-1.2deg) translateY(1px); } }
+@media (prefers-reduced-motion: reduce) { .scene-tree { animation: none !important; } }

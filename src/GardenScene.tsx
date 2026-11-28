@@ -100,7 +100,10 @@ export default function GardenScene({ store }: { store: Store }) {
       <div className="scene-scroll" ref={scroller} onScroll={() => { if (ready.current && hint) setHint(false) }}>
         <div className={'scene' + (night ? ' night' : '')} role="img" aria-label={`我的花園，${phaseName(m)}，種了 ${planted.length} 叢花`}>
           <img className="scene-bg" src="garden/backdrop.webp" alt="" draggable={false} />
-          <img className="scene-tree" src="garden/tree.webp" alt="" draggable={false} style={{ left: 0, top: 0, width: px(860), height: py(360) }} />
+          {/* 大樹的樹冠分成 4 叢，各自隨風擺動 */}
+          {[0, 1, 2, 3].map((k) => (
+            <img key={k} className={`scene-tree t${k}`} src={`garden/tree-${k}.webp`} alt="" draggable={false} style={{ left: 0, top: 0, width: px(860), height: py(360) }} />
+          ))}
           <img key={hasWisteria ? 'w1' : 'w0'} className={'scene-vines' + (hasWisteria ? ' bloomed' : '')} src={hasWisteria ? 'garden/vines-wisteria.webp' : 'garden/vines.webp'} alt="" draggable={false} style={{ left: px(480), top: py(170), width: px(280), height: py(310) }} />
           <img key={hasRose ? 'r1' : 'r0'} className={'scene-vines right' + (hasRose ? ' bloomed' : '')} src={hasRose ? 'garden/vines-rose.webp' : 'garden/vines-right.webp'} alt="" draggable={false} style={{ left: px(1020), top: py(150), width: px(280), height: py(370) }} />
           {sun && <img className="sun-img" src="garden/sun.webp" alt="" draggable={false} style={{ left: px(sun.x), top: py(sun.y), opacity: 1 - light.stars }} />}
