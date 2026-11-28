@@ -3,7 +3,8 @@ import type { useStore } from './store'
 import { ACTIVITIES } from './exercise-data'
 import { addDays, fmtDate, parseISO, sortedWeights, todayISO, uid } from './util'
 import { dayActivity, STEP_BASELINE } from './activity'
-import { friendlyError, readSteps, type StepRead } from './ai'
+import { friendlyError, maxImages, readSteps, type StepRead } from './ai'
+import { extractFrames } from './video'
 import { ask, toast } from './dialogs'
 import { Icon } from './icons'
 import { Bar, DateButton, PageHead, Seg, Sheet, dateLabel, fmt } from './ui'
@@ -67,7 +68,7 @@ export default function Activity({ store }: { store: Store }) {
       </section>
 
       <div className="btn-pair">
-        <button className="btn-soft" onClick={() => setSheet('import')}><Icon name="image" size={18} />匯入步數截圖</button>
+        <button className="btn-soft" onClick={() => setSheet('import')}><Icon name="image" size={18} />匯入步數</button>
         <button className="btn-line" onClick={() => setSheet('manual')}><Icon name="pencil" size={18} />手動輸入</button>
       </div>
 
@@ -93,7 +94,7 @@ export default function Activity({ store }: { store: Store }) {
             <button className="icon-btn sm" onClick={() => removeEx(e.id, e.name)} aria-label={`刪除 ${e.name}`}><Icon name="close" size={16} /></button>
           </div>
         ))}
-        {!st && !exs.length && <p className="empty">還沒有紀錄。截一張健康 App 或 Garmin 的步數畫面匯入最快。</p>}
+        {!st && !exs.length && <p className="empty">還沒有紀錄。用健康 App 或 Garmin 的截圖、螢幕錄影匯入最快。</p>}
       </section>
 
       <section className="block">
@@ -165,20 +166,45 @@ function StepBars({ bars, goal }: { bars: { key: string; label: string; v: numbe
 
 function StepImport({ store, onClose }: { store: Store; onClose: () => void }) {
   const fileRef = useRef<HTMLInputElement>(null)
-  const [busy, setBusy] = useState(false)
+  const videoRef = useRef<HTMLInputElement>(null)
+  const [busy, setBusy] = useState('')
   const [err, setErr] = useState('')
   const [res, setRes] = useState<{ days: StepRead[]; source: string; note: string } | null>(null)
   const [sel, setSel] = useState<boolean[]>([])
   const existing = store.data.steps ?? {}
 
   const run = async (file: File) => {
-    setBusy(true); setErr(''); setRes(null)
+    setErr(''); setRes(null)
     try {
-      const r = await readSteps(file, todayISO())
+      let r: { days: StepRead[]; source: string; note: string }
+      if (file.type.startsWith('video/') || /\.(mov|mp4|m4v|webm)$/i.test(file.name)) {
+        setBusy('擷取錄影畫面中…')
+        const max = await maxImages()
+        const frames = await extractFrames(file, max * 3, (d, t) => setBusy(`擷取錄影畫面中…（${d}/${t}）`))
+        if (!frames.length) throw new Error('錄影裡沒有擷取到畫面，請換一段再試。')
+        // 一次能傳的張數有限，長錄影分批（最多 3 批）再合併
+        const batches = Array.from({ length: Math.ceil(frames.length / max) }, (_, i) => frames.slice(i * max, i * max + max))
+        const merged = new Map<string, StepRead>()
+        let source = '', note = ''
+        for (let i = 0; i < batches.length; i++) {
+          setBusy(batches.length > 1 ? `Claude 讀取中（第 ${i + 1}/${batches.length} 批），約 20–60 秒…` : 'Claude 讀取中，約 20–60 秒…')
+          const part = await readSteps(batches[i], todayISO())
+          for (const d of part.days) {
+            const old = merged.get(d.date)
+            if (!old || d.steps > old.steps) merged.set(d.date, d)
+          }
+          source ||= part.source
+          note ||= part.note
+        }
+        r = { days: [...merged.values()], source, note }
+      } else {
+        setBusy('Claude 讀取中，約 10–40 秒…')
+        r = await readSteps(file, todayISO())
+      }
       r.days.sort((a, b) => b.date.localeCompare(a.date))
       setRes(r); setSel(r.days.map(() => true))
     } catch (e) { setErr(friendlyError(e)) }
-    setBusy(false)
+    setBusy('')
   }
   const setSteps = (i: number, v: string) => setRes(res && { ...res, days: res.days.map((d, j) => (j === i ? { ...d, steps: Math.max(0, Math.round(Number(v.replace(/\D/g, '')) || 0)) } : d)) })
   const save = () => {
@@ -190,19 +216,31 @@ function StepImport({ store, onClose }: { store: Store; onClose: () => void }) {
   }
 
   return (
-    <Sheet title="匯入步數截圖" onClose={onClose}>
+    <Sheet title="匯入步數" onClose={onClose}>
       <input ref={fileRef} type="file" accept="image/*" hidden onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) run(f) }} />
+      <input ref={videoRef} type="file" accept="video/*" hidden onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) run(f) }} />
       {!res && (
         <>
+          <h3 className="sec">方法一：截圖（補一週）</h3>
           <ol className="steps-howto">
             <li><b>iPhone 健康 App</b>：瀏覽 → 活動 → 步數 → 選「週」，截圖。</li>
-            <li><b>Garmin Connect</b>：首頁的「步數」卡片 → 切到「7 天」，截圖。</li>
-            <li>回到這裡選那張截圖，Claude 會讀出每一天的步數。</li>
+            <li><b>Garmin Connect</b>：「步數」卡片 → 切到「7 天」，截圖。</li>
           </ol>
-          <p className="note">一週的截圖可以一次補齊 7 天。網頁 App 無法直接連到健康 App 或 Garmin，所以用截圖匯入。</p>
-          <button className="btn-dark" onClick={() => fileRef.current?.click()} disabled={busy}>
-            {busy ? 'Claude 讀取中，約 10–40 秒…' : <><Icon name="image" size={18} />選擇截圖</>}
-          </button>
+          <h3 className="sec">方法二：螢幕錄影（一次補很多天）</h3>
+          <ol className="steps-howto">
+            <li><b>iPhone 健康 App</b>：步數 → 滑到最下面「顯示所有資料」，開始螢幕錄影，慢慢往下滑過想補的日期。</li>
+            <li><b>Garmin Connect</b>：步數 → 切到「4 週」，開始錄影，左右切換每一週。</li>
+            <li>錄 10–30 秒就好，每個畫面停留約 1 秒，讓數字清楚。</li>
+          </ol>
+          <p className="note">網頁 App 無法直接連到健康 App 或 Garmin，所以用截圖或錄影匯入。錄影只在手機上擷取畫面，只有擷取的畫面會傳給 Claude。</p>
+          {busy ? (
+            <button className="btn-dark" disabled>{busy}</button>
+          ) : (
+            <div className="btn-pair">
+              <button className="btn-dark" onClick={() => fileRef.current?.click()}><Icon name="image" size={18} />選擇截圖</button>
+              <button className="btn-dark" onClick={() => videoRef.current?.click()}><Icon name="video" size={18} />選擇錄影</button>
+            </div>
+          )}
         </>
       )}
       {err && <div className="alert">{err}</div>}

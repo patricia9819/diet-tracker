@@ -48,6 +48,7 @@ const P: Record<string, ReactNode> = {
   download: <><path d="M12 4v11M7.5 10.5L12 15l4.5-4.5" /><path d="M4.5 19.5h15" /></>,
   upload: <><path d="M12 15V4M7.5 8.5L12 4l4.5 4.5" /><path d="M4.5 19.5h15" /></>,
   users: <><circle cx="9" cy="8.5" r="3.2" /><path d="M3 19.5c.9-3.1 3.2-4.8 6-4.8s5.1 1.7 6 4.8" /><path d="M15.5 5.6a3.2 3.2 0 0 1 0 6M17.5 14.9c1.6.6 2.8 2.2 3.5 4.6" /></>,
+  video: <><rect x="3" y="6" width="13" height="12" rx="2.5" /><path d="M16 10.5l5-3v9l-5-3z" /></>,
   phone: <><rect x="6.5" y="3" width="11" height="18" rx="2.5" /><path d="M10.5 18h3" /></>
 }
 

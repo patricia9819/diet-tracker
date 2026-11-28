@@ -337,7 +337,7 @@ function Help() {
     { icon: 'camera', title: '拍照辨識', text: '新增餐點 → 拍照／聚餐。拍下整份餐點，Claude 會列出每樣食物和熱量，可以先修改再加入。第一次使用要在跳出的視窗允許 Claude。' },
     { icon: 'users', title: '聚餐分食', text: '拍照時切到「聚餐分食」，選人數，開動前拍整桌菜。每道合菜選「沒吃／一點／平均／比較多」，自動算出你那一份。' },
     { icon: 'barcode', title: '拍條碼', text: '拍包裝上的條碼。存過的產品會直接找到；新的產品拍營養標示，Claude 會讀出數值並幫你存起來。' },
-    { icon: 'footprints', title: '步數', text: '在 iPhone 健康 App 或 Garmin Connect 截一張步數畫面（建議選「週」），到「活動 → 匯入步數截圖」，一次補齊 7 天。' },
+    { icon: 'footprints', title: '步數', text: '在 iPhone 健康 App 或 Garmin Connect 截一張步數畫面（建議選「週」），到「活動 → 匯入步數」；想一次補很多天，可以改用螢幕錄影慢慢滑過步數紀錄。' },
     { icon: 'sparkle', title: 'AI 飲食建議', text: '記錄 3 天以上後到「建議」按「產生建議」，Claude 會依你的奶蛋素、不吃五辛習慣給具體建議。' },
     { icon: 'leaf', title: '素食提醒', text: '辨識結果裡標示「注意」的食物，可能含葷料、葷高湯或五辛，點菜或購買前可以再確認。' }
   ]

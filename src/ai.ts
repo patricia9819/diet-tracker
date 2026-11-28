@@ -103,11 +103,22 @@ export async function readNutritionLabel(photo: Blob, dietInfo: string): Promise
 export interface StepRead { date: string; steps: number; km: number }
 
 /** 讀健康 App / Garmin Connect 的步數截圖 */
-export async function readSteps(photo: Blob, today: string): Promise<{ days: StepRead[]; source: string; note: string }> {
+/** 每次最多可以傳幾張圖 */
+export async function maxImages() {
+  const s = await getSample()
+  const l = s ? await s.limits().catch(() => null) : null
+  return l?.images?.maxCount ?? 5
+}
+
+export async function readSteps(photo: Blob | Blob[], today: string): Promise<{ days: StepRead[]; source: string; note: string }> {
+  const many = Array.isArray(photo) && photo.length > 1
   const d = new Date(today + 'T12:00:00')
   const week = '日一二三四五六'[d.getDay()]
   const prompt = [
-    '附上的圖片是手機健康 App（例如 iPhone「健康」、Garmin Connect、Google Fit、小米運動）的步數截圖。',
+    many
+      ? '附上的多張圖片，是同一段手機螢幕錄影依時間順序擷取的畫面，內容是健康 App（例如 iPhone「健康」、Garmin Connect）的步數紀錄，使用者在畫面中上下滑動或切換日期。'
+      : '附上的圖片是手機健康 App（例如 iPhone「健康」、Garmin Connect、Google Fit、小米運動）的步數截圖。',
+    many ? '請綜合所有畫面，每一天只列一次；同一天在不同畫面出現時，以最清楚的數字為準。' : '',
     `今天是 ${today}（星期${week}）。請讀出圖片裡每一天的步數，並換算成日期（YYYY-MM-DD）。`,
     '「今天」「昨天」「週三」或只有月日的標示，請依今天的日期推算；年份不明時用最接近今天、且不晚於今天的日期。',
     '如果是一週或一個月的長條圖，只列出圖上有明確數字、或能清楚讀出數值的日子，不要猜。看不出日期的數字不要列。',

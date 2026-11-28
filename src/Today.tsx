@@ -45,7 +45,7 @@ export default function Today({ store, currentKg, goBody }: { store: Store; curr
     if (rem.meals && hour >= 14 && !has('lunch')) todos.push({ icon: 'bowl', text: '午餐還沒記' })
     if (rem.meals && hour >= 20 && !has('dinner')) todos.push({ icon: 'leaf', text: '晚餐還沒記' })
     const should = Math.min(waterGoal, Math.max(0, ((hour - 8) / 12) * waterGoal))
-    if (rem.water && hour >= 11 && water < should - 250) todos.push({ icon: 'drop', text: `水喝得有點少，此刻建議約 ${Math.round(should / 250) * 250} ml` })
+    if (rem.water && hour >= 11 && water < should - 200) todos.push({ icon: 'drop', text: `水喝得有點少，此刻建議約 ${Math.round(should / 100) * 100} ml` })
   }
   const st = streak(data)
 
@@ -108,8 +108,8 @@ export default function Today({ store, currentKg, goBody }: { store: Store; curr
           <div className="tile-val">{fmt(water)} / {fmt(waterGoal)} ml</div>
           <Bar value={water} max={waterGoal} tone="blue" />
           <div className="tile-actions">
-            <button className="mini" onClick={() => setWater(water - 250)} disabled={water <= 0} aria-label="減少 250 毫升"><Icon name="minus" size={16} /></button>
-            <button className="mini fill" onClick={() => setWater(water + 250)}>+250</button>
+            <button className="mini" onClick={() => setWater(water - 100)} disabled={water <= 0} aria-label="減少 100 毫升"><Icon name="minus" size={16} /></button>
+            <button className="mini fill" onClick={() => setWater(water + 100)}>+100 ml</button>
           </div>
         </div>
         <button className="tile" onClick={goBody}>
