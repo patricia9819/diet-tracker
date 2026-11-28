@@ -660,3 +660,11 @@ body:has(.garden-app) { background: var(--gp-bg); }
 .scene-vines.bloomed { animation: vineBloom 1.4s ease-out, wisteriaSway 5.2s ease-in-out 1.4s infinite; }
 @keyframes vineBloom { from { opacity: 0; } to { opacity: 1; } }
 @media (prefers-reduced-motion: reduce) { .cal.slide-l, .cal.slide-r, .scene-vines.right, .scene-vines.bloomed { animation: none; } }
+
+/* 紙雕太陽與月亮 */
+.sun-img, .moon-img { position: absolute; transform: translate(-50%, -50%); pointer-events: none; z-index: 2; transition: left 60s linear, top 60s linear, opacity 3s; }
+.sun-img { width: 10%; height: auto; filter: drop-shadow(0 4px 6px rgba(160, 110, 40, .3)) drop-shadow(0 0 18px rgba(255, 220, 140, .55)); animation: sunSpin 60s linear infinite; }
+@keyframes sunSpin { to { transform: translate(-50%, -50%) rotate(360deg); } }
+.moon-img { width: 7.5%; height: auto; filter: drop-shadow(0 0 14px rgba(255, 240, 190, .7)); animation: moonFloat 6s ease-in-out infinite; }
+@keyframes moonFloat { 50% { transform: translate(-50%, -56%) rotate(-4deg); } }
+@media (prefers-reduced-motion: reduce) { .sun-img, .moon-img { animation: none; } }

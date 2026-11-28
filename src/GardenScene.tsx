@@ -103,8 +103,18 @@ export default function GardenScene({ store }: { store: Store }) {
           <img className="scene-tree" src="garden/tree.webp" alt="" draggable={false} style={{ left: 0, top: 0, width: px(860), height: py(360) }} />
           <img key={hasWisteria ? 'w1' : 'w0'} className={'scene-vines' + (hasWisteria ? ' bloomed' : '')} src={hasWisteria ? 'garden/vines-wisteria.webp' : 'garden/vines.webp'} alt="" draggable={false} style={{ left: px(480), top: py(170), width: px(280), height: py(310) }} />
           <img key={hasRose ? 'r1' : 'r0'} className={'scene-vines right' + (hasRose ? ' bloomed' : '')} src={hasRose ? 'garden/vines-rose.webp' : 'garden/vines-right.webp'} alt="" draggable={false} style={{ left: px(1020), top: py(150), width: px(280), height: py(370) }} />
-          {sun && <span className="sun" style={{ left: px(sun.x), top: py(sun.y), opacity: 1 - light.stars }} />}
-          {moon && night && <span className="moon" style={{ left: px(moon.x), top: py(moon.y), opacity: light.stars }} />}
+          {sun && <img className="sun-img" src="garden/sun.webp" alt="" draggable={false} style={{ left: px(sun.x), top: py(sun.y), opacity: 1 - light.stars }} />}
+          {moon && night && (
+            <svg className="moon-img" viewBox="0 0 100 100" aria-hidden="true" style={{ left: px(moon.x), top: py(moon.y), opacity: light.stars }}>
+              <defs>
+                <radialGradient id="mn-g" cx="40%" cy="35%" r="70%"><stop offset="0" stopColor="#fff8dc" /><stop offset="1" stopColor="#f0dea6" /></radialGradient>
+                <filter id="mn-s"><feDropShadow dx="2" dy="3" stdDeviation="2.5" floodColor="#2a2540" floodOpacity=".45" /></filter>
+              </defs>
+              <path d="M62 8 A42 42 0 1 0 92 70 A34 34 0 1 1 62 8 Z" fill="#e2cd92" transform="translate(3 3)" />
+              <path d="M62 8 A42 42 0 1 0 92 70 A34 34 0 1 1 62 8 Z" fill="url(#mn-g)" filter="url(#mn-s)" />
+              <circle cx="30" cy="52" r="4" fill="#ead6a0" /><circle cx="40" cy="74" r="3" fill="#ead6a0" /><circle cx="24" cy="34" r="2.5" fill="#ead6a0" />
+            </svg>
+          )}
           <span className="fountain" style={{ left: px(1250), top: py(700) }} aria-hidden="true"><i /><i /><i /></span>
 
           {items.map((it) => {
