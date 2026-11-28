@@ -34,7 +34,7 @@ export default function Garden({ store }: { store: Store }) {
       <GardenScene store={store} />
       <div className="scene-stats">
         <span>{+today.slice(5, 7)} 月已開 <b>{bloomsThisMonth}</b> 朵</span>
-        <span>花園裡共 <b>{Object.keys(data.water).filter((d) => d < today && stageOf(data.water[d], goal) === 4).length}</b> 朵</span>
+        <span>花園裡共 <b>{Object.keys(data.water).filter((d) => d < today && stageOf(data.water[d], goal) === 4).length}</b> 叢</span>
         <span>圖鑑 <b>{got.size}</b>/{FLOWERS.length}</span>
       </div>
 

@@ -56,6 +56,8 @@ export default function WaterPlant({ store, date, variant = 'food', onOpen }: { 
   const [grow, setGrow] = useState<{ from: number; key: number } | null>(null)
   const [bloom, setBloom] = useState(0)
   const [card, setCard] = useState<{ f: Flower; isNew: boolean } | null>(null)
+  const [typing, setTyping] = useState(false)
+  const [ml, setMl] = useState('')
   const nid = useRef(0)
   const prev = useRef({ stage, fid: f?.id })
   const wasCollected = useRef(f ? collection(data).has(f.id) : false)
@@ -180,7 +182,28 @@ export default function WaterPlant({ store, date, variant = 'food', onOpen }: { 
         {cups.slice(0, 2).map((c, i) => (
           <button className="wb cup" key={i} onClick={() => add(c)}><Icon name={i === 0 ? 'cup' : 'bottle'} size={17} />{fmt(c)}</button>
         ))}
+        <button className="wb undo" onClick={() => { setMl(''); setTyping(true) }} aria-label="手動輸入喝水量"><Icon name="pencil" size={17} /></button>
       </div>
+
+      {typing && (
+        <Sheet title="輸入喝水量" onClose={() => setTyping(false)}>
+          <form className="water-form" onSubmit={(e) => {
+            e.preventDefault()
+            const v = Math.round(Number(ml))
+            if (!(v > 0 && v <= 5000)) return toast('請輸入 1–5000 ml')
+            add(v); setTyping(false)
+          }}>
+            <label className="field">這次喝了多少（ml）
+              <input id="water-ml" inputMode="numeric" value={ml} onChange={(e) => setMl(e.target.value.replace(/\D/g, ''))} placeholder="例如 350" autoFocus />
+            </label>
+            <div className="row" style={{ marginTop: 10 }}>
+              {[150, 250, 350, 500, 600].map((v) => <button type="button" key={v} className={Number(ml) === v ? 'chip on' : 'chip'} onClick={() => setMl(String(v))}>{v}</button>)}
+            </div>
+            <p className="note">喝了半杯、喝別的杯子，或補記之前忘了記的量，都可以在這裡輸入。今天目前 {fmt(water)} / {fmt(goal)} ml。</p>
+            <button className="btn-dark" type="submit">加入{ml ? ` ${fmt(Number(ml))} ml` : ''}</button>
+          </form>
+        </Sheet>
+      )}
 
       {card && (
         <Sheet title={card.isNew ? '新的花收進圖鑑了！' : '今天的花開了！'} onClose={() => setCard(null)}>
