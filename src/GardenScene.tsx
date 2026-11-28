@@ -21,16 +21,17 @@ const CLUMP = [
 
 // 一天中的光線：[分鐘, 色調 r, g, b, 濃度, 燈光, 星星]
 const KEYS: [number, number, number, number, number, number, number][] = [
-  [0, 38, 50, 96, 0.64, 1, 1],
-  [300, 38, 50, 96, 0.64, 1, 1],
-  [360, 232, 168, 190, 0.3, 0.45, 0.2],
-  [450, 255, 222, 186, 0.12, 0, 0],
+  // 夜晚只把天空換成夜空，地面只稍微變暗、偏紫，保持溫暖明亮
+  [0, 168, 156, 206, 0.24, 1, 1],
+  [300, 168, 156, 206, 0.24, 1, 1],
+  [360, 236, 186, 200, 0.22, 0.5, 0.35],
+  [450, 255, 226, 196, 0.1, 0, 0],
   [720, 255, 255, 255, 0, 0, 0],
-  [960, 255, 214, 160, 0.12, 0, 0],
-  [1050, 246, 166, 106, 0.3, 0.2, 0],
-  [1110, 118, 92, 150, 0.46, 0.85, 0.45],
-  [1200, 38, 50, 96, 0.64, 1, 1],
-  [1440, 38, 50, 96, 0.64, 1, 1]
+  [960, 255, 218, 170, 0.1, 0, 0],
+  [1050, 248, 178, 128, 0.24, 0.25, 0.1],
+  [1110, 196, 160, 196, 0.26, 0.85, 0.6],
+  [1200, 168, 156, 206, 0.24, 1, 1],
+  [1440, 168, 156, 206, 0.24, 1, 1]
 ]
 function lightAt(m: number) {
   const i = KEYS.findIndex((k) => k[0] > m)
@@ -82,7 +83,7 @@ export default function GardenScene({ store }: { store: Store }) {
   const sunP = (m - 360) / 750
   const moonP = ((m - 1080 + 1440) % 1440) / 720
   const sun = sunP >= 0 && sunP <= 1 ? { x: 980 + 520 * sunP, y: 230 - Math.sin(Math.PI * sunP) * 190 } : null
-  const moon = moonP >= 0 && moonP <= 1 ? { x: 1010 + 470 * moonP, y: 210 - Math.sin(Math.PI * moonP) * 160 } : null
+  const moon = moonP >= 0 && moonP <= 1 ? { x: 1250 + 190 * moonP, y: 150 - Math.sin(Math.PI * moonP) * 62 } : null   // 留在右上方的夜空，不壓到溫室屋頂
 
   type Item = { key: string; f: Flower; stage: number; x: number; y: number; k: number; flip: boolean; label: string; delay: number; today?: boolean }
   const items: Item[] = []
@@ -100,6 +101,7 @@ export default function GardenScene({ store }: { store: Store }) {
       <div className="scene-scroll" ref={scroller} onScroll={() => { if (ready.current && hint) setHint(false) }}>
         <div className={'scene' + (night ? ' night' : '')} role="img" aria-label={`我的花園，${phaseName(m)}，種了 ${planted.length} 叢花`}>
           <img className="scene-bg" src="garden/backdrop.webp" alt="" draggable={false} />
+          {light.stars > 0 && <img className="scene-bg night-sky" src="garden/night-sky.webp" alt="" draggable={false} style={{ opacity: light.stars }} />}
           {/* 大樹的樹冠分成 4 叢，各自隨風擺動 */}
           {[0, 1, 2, 3].map((k) => (
             <img key={k} className={`scene-tree t${k}`} src={`garden/tree-${k}.webp`} alt="" draggable={false} style={{ left: 0, top: 0, width: px(860), height: py(360) }} />
@@ -107,17 +109,7 @@ export default function GardenScene({ store }: { store: Store }) {
           <img key={hasWisteria ? 'w1' : 'w0'} className={'scene-vines' + (hasWisteria ? ' bloomed' : '')} src={hasWisteria ? 'garden/vines-wisteria.webp' : 'garden/vines.webp'} alt="" draggable={false} style={{ left: px(480), top: py(170), width: px(280), height: py(310) }} />
           <img key={hasRose ? 'r1' : 'r0'} className={'scene-vines right' + (hasRose ? ' bloomed' : '')} src={hasRose ? 'garden/vines-rose.webp' : 'garden/vines-right.webp'} alt="" draggable={false} style={{ left: px(1020), top: py(150), width: px(280), height: py(370) }} />
           {sun && <img className="sun-img" src="garden/sun.webp" alt="" draggable={false} style={{ left: px(sun.x), top: py(sun.y), opacity: 1 - light.stars }} />}
-          {moon && night && (
-            <svg className="moon-img" viewBox="0 0 100 100" aria-hidden="true" style={{ left: px(moon.x), top: py(moon.y), opacity: light.stars }}>
-              <defs>
-                <radialGradient id="mn-g" cx="40%" cy="35%" r="70%"><stop offset="0" stopColor="#fff8dc" /><stop offset="1" stopColor="#f0dea6" /></radialGradient>
-                <filter id="mn-s"><feDropShadow dx="2" dy="3" stdDeviation="2.5" floodColor="#2a2540" floodOpacity=".45" /></filter>
-              </defs>
-              <path d="M62 8 A42 42 0 1 0 92 70 A34 34 0 1 1 62 8 Z" fill="#e2cd92" transform="translate(3 3)" />
-              <path d="M62 8 A42 42 0 1 0 92 70 A34 34 0 1 1 62 8 Z" fill="url(#mn-g)" filter="url(#mn-s)" />
-              <circle cx="30" cy="52" r="4" fill="#ead6a0" /><circle cx="40" cy="74" r="3" fill="#ead6a0" /><circle cx="24" cy="34" r="2.5" fill="#ead6a0" />
-            </svg>
-          )}
+          {moon && light.stars > 0.2 && <img className="moon-img" src="garden/moon.webp" alt="" draggable={false} style={{ left: px(moon.x), top: py(moon.y), opacity: Math.min(1, light.stars * 1.3) }} />}
           <span className="fountain" style={{ left: px(1250), top: py(700) }} aria-hidden="true"><i /><i /><i /></span>
           {/* 噴水池往下流的水：上層碗邊→下層碗、下層碗邊→水池 */}
           {[[1200, 548, 42], [1222, 552, 38], [1278, 552, 38], [1300, 548, 42], [1156, 598, 92], [1180, 604, 86], [1322, 604, 86], [1346, 598, 92]].map(([x, y, h], i) => (

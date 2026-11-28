@@ -716,3 +716,8 @@ body:has(.garden-app) { background: var(--gp-bg); }
 @keyframes leafA { 0%, 100% { transform: rotate(-.7deg); } 50% { transform: rotate(.75deg) translateX(1px); } }
 @keyframes leafB { 0%, 100% { transform: rotate(.65deg); } 45% { transform: rotate(-.8deg) translateY(1px); } }
 @media (prefers-reduced-motion: reduce) { .scene-tree { animation: none !important; } }
+
+/* 夜空圖層與紙雕月亮 */
+.scene-wrap .night-sky { position: absolute; inset: 0; width: 100%; height: 100%; transition: opacity 3s; pointer-events: none; }
+.moon-img { width: 9%; height: auto; filter: drop-shadow(0 0 16px rgba(255, 236, 180, .65)) drop-shadow(0 3px 4px rgba(40, 30, 70, .35)); }
+.scene .tint { mix-blend-mode: multiply; }
