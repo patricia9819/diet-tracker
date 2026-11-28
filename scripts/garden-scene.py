@@ -36,7 +36,16 @@ def overlay(box, name, ellipse, plant_only=False):
     c.putalpha(m)
     c.save(out + name, quality=84, method=4)
 
-overlay((0, 0, 860, 360), 'tree.webp', (-0.3, -0.6, 1.0, 0.95))       # 左上大樹的樹冠
+overlay((0, 0, 860, 360), 'tree.webp', (-0.3, -0.6, 1.0, 0.95), True)     # 左上大樹的樹冠
+# 樹冠只留大樹自己的葉子：去掉溫室旁的藤蔓（右下）和遠處淡綠色的背景樹（右上，飽和度較低）
+_t = Image.open(out + 'tree.webp').convert('RGBA')
+_a = np.array(_t).astype(float)
+_r, _g, _b = _a[..., 0], _a[..., 1], _a[..., 2]
+_sat = (_a[..., :3].max(2) - _a[..., :3].min(2)) / (_a[..., :3].max(2) + 1e-6)
+_yy, _xx = np.mgrid[0:_a.shape[0], 0:_a.shape[1]]
+_keep = ~(((_xx > 470) & (_yy > 150)) | ((_xx > 560) & (_sat < 0.32)))
+_a[..., 3] *= ndimage.gaussian_filter(_keep.astype(float), 3)
+Image.fromarray(_a.astype(np.uint8), 'RGBA').save(out + 'tree.webp', quality=84, method=4)
 LEFT, RIGHT = (480, 170, 760, 480), (1020, 150, 1300, 520)
 overlay(LEFT, 'vines.webp', (0.05, -0.1, 0.95, 1.0), True)                   # 溫室左側的藤蔓
 overlay(RIGHT, 'vines-right.webp', (0.08, -0.05, 0.92, 1.0), True)          # 溫室右側的藤蔓

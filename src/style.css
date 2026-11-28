@@ -701,3 +701,8 @@ body:has(.garden-app) { background: var(--gp-bg); }
 .item-edit { text-align: left; min-width: 0; }
 .edit-hint { color: var(--muted); margin-left: 6px; vertical-align: -1px; }
 .photo-big { width: 100%; border-radius: 14px; display: block; }
+
+/* 大樹只擺動樹冠的葉子，幅度小 */
+.scene-tree { transform-origin: 10% 100%; animation: treeLeaves 7s ease-in-out infinite; }
+@keyframes treeLeaves { 0%, 100% { transform: rotate(-.35deg); } 50% { transform: rotate(.4deg); } }
+@media (prefers-reduced-motion: reduce) { .scene-tree { animation: none; } }
