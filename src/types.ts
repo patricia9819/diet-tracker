@@ -98,6 +98,7 @@ export interface AppData {
   advice: Advice[]
   steps: Record<string, StepDay> // date -> 步數
   waterLog?: Record<string, [number, number][]> // date -> [當天第幾分鐘, ml]，畫喝水時間軸用
+  garden?: Record<string, string> // date -> 當天抽到的花（flowers/manifest.json 的 id）
   photos: Record<string, Partial<Record<Meal, string>>> // date -> 餐點縮圖（data URL）
 }
 

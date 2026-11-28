@@ -1,21 +1,24 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useStore } from './store'
 import Today from './Today'
 import WeightView from './WeightView'
 import Activity from './Activity'
 import Advice from './Advice'
+import Garden from './Garden'
+import { dayTasks } from './garden'
 import ProfilePage, { ProfileForm } from './Settings'
 import { sortedWeights } from './util'
-import { Dialogs } from './dialogs'
+import { celebrate, Dialogs } from './dialogs'
 import { Icon } from './icons'
 import { PageHead } from './ui'
 
-type Tab = 'food' | 'body' | 'move' | 'insight' | 'me'
+type Tab = 'food' | 'body' | 'move' | 'garden' | 'insight' | 'me'
 
 const TABS: { key: Tab; icon: string; label: string }[] = [
   { key: 'food', icon: 'food', label: '飲食' },
   { key: 'body', icon: 'body', label: '體態' },
   { key: 'move', icon: 'walk', label: '活動' },
+  { key: 'garden', icon: 'flower', label: '花園' },
   { key: 'insight', icon: 'sparkle', label: '建議' },
   { key: 'me', icon: 'user', label: '我的' }
 ]
@@ -24,6 +27,16 @@ export default function App() {
   const store = useStore()
   const { data } = store
   const [tab, setTab] = useState<Tab>('food')
+
+  // 今日任務剛好全部完成時，蓋下「今日完成」印章
+  const ready = store.status === 'cloud' || store.status === 'local'
+  const allDone = ready && !!data.profile && dayTasks(data).done
+  const prevDone = useRef<boolean | null>(null)
+  useEffect(() => {
+    if (!ready) return
+    if (prevDone.current === false && allDone) celebrate('stamp')
+    prevDone.current = allDone
+  }, [allDone, ready])
 
   if (store.status === 'loading' || store.status === 'error') {
     return (
@@ -55,7 +68,7 @@ export default function App() {
   const go = (t: Tab) => { setTab(t); window.scrollTo(0, 0) }
 
   return (
-    <div className="app">
+    <div className={tab === 'garden' ? 'app garden-app' : 'app'}>
       <main>
         {store.saveError && <div className="alert">{store.saveError}</div>}
         {tab === 'food' && (
@@ -70,6 +83,7 @@ export default function App() {
         )}
         {tab === 'body' && <WeightView store={store} />}
         {tab === 'move' && <Activity store={store} />}
+        {tab === 'garden' && <Garden store={store} />}
         {tab === 'insight' && <Advice store={store} />}
         {tab === 'me' && <ProfilePage store={store} />}
       </main>

@@ -1,4 +1,5 @@
 import { useEffect, useRef, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import { Icon } from './icons'
 import { parseISO, todayISO } from './util'
 
@@ -37,7 +38,8 @@ export function Sheet({ title, onClose, children, full }: { title: string; onClo
     window.addEventListener('keydown', k)
     return () => window.removeEventListener('keydown', k)
   }, [onClose])
-  return (
+  // 用 portal 放到最上層，避免被頁面的圖層或底部功能列蓋住
+  return createPortal(
     <div className="sheet-bg" onClick={onClose}>
       <div className={full ? 'sheet full' : 'sheet'} ref={ref} onClick={(e) => e.stopPropagation()} role="dialog" aria-label={title}>
         <div className="sheet-head">
@@ -46,7 +48,8 @@ export function Sheet({ title, onClose, children, full }: { title: string; onClo
         </div>
         <div className="sheet-body">{children}</div>
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }
 

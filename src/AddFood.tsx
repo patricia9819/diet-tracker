@@ -6,7 +6,7 @@ import { uid } from './util'
 import { allowedFood, avoidsFive, dietPrompt } from './diet'
 import { friendlyError, readNutritionLabel, recognizeMeal, type MealResult } from './ai'
 import { decodeBarcode } from './barcode'
-import { toast } from './dialogs'
+import { celebrate, toast } from './dialogs'
 import { Icon } from './icons'
 
 type Store = ReturnType<typeof useStore>
@@ -72,6 +72,7 @@ export default function AddFood({ store, date, meal: initialMeal, onClose }: { s
       photos: thumb ? { ...d.photos, [date]: { ...(d.photos?.[date] ?? {}), [meal]: thumb } } : d.photos,
       logs: [...d.logs, ...items.filter((x) => x.s > 0).map(({ f, s }) => ({ id: uid(), date, meal, foodId: f.id, name: f.name, unit: f.unit, servings: s, kcal: f.kcal, protein: f.protein, carbs: f.carbs, fat: f.fat }))]
     }))
+    celebrate('leaves')
     onClose()
   }
   const add = (f: FoodItem, s: number) => addMany([{ f, s }])
