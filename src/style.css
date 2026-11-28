@@ -339,3 +339,15 @@ button.tile { background: var(--card); border: 1px solid var(--line); }
 .hero-kcal, .hero-move { margin-right: calc(-1 * max(20px, env(safe-area-inset-right, 0px))); padding-right: max(20px, env(safe-area-inset-right, 0px)); }
 .deco.b { mix-blend-mode: normal; opacity: .75; }
 .num small { display: inline; font-size: 12px; margin: 0 0 0 4px; }
+
+/* 鎖定左右：頁面只能上下捲動，任何元素都不會把畫面撐寬 */
+html, body { overflow-x: hidden; overscroll-behavior-x: none; }
+body { touch-action: pan-y pinch-zoom; }
+.app { overflow-x: clip; }
+main > *, .block, .tiles > *, .duo > div, .trio > div, .stat-row > div { min-width: 0; }
+.big { font-size: clamp(40px, 13.5vw, 54px); }
+.duo .big { font-size: clamp(28px, 10.5vw, 44px); overflow-wrap: anywhere; }
+.trio b, .stat-row b { white-space: normal; overflow-wrap: anywhere; font-size: clamp(17px, 5.6vw, 24px); }
+.stat-row b { font-size: clamp(16px, 5vw, 21px); }
+.tile-big { font-size: clamp(22px, 7vw, 26px); overflow-wrap: anywhere; }
+.insight-title { font-size: clamp(21px, 6.8vw, 26px); }
