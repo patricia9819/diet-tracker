@@ -3,6 +3,7 @@ import type { useStore } from './store'
 import { collection, dayFlower, flowerOf, flowerSrc, STAGES, stageOf, type Flower } from './garden'
 import { fmtDate, todayISO } from './util'
 import layout from '../public/garden/spots.json'
+import cloudData from '../public/garden/clouds.json'
 
 type Store = ReturnType<typeof useStore>
 
@@ -134,7 +135,17 @@ export default function GardenScene({ store }: { store: Store }) {
       <div className="scene-scroll" ref={scroller} onScroll={() => { if (ready.current && hint) setHint(false) }}>
         <div className={'scene' + (night ? ' night' : '')} role="img" aria-label={`我的花園，${phaseName(m)}，種了 ${planted.length} 叢花`}>
           <img className="scene-bg" src="garden/backdrop.webp" alt="" draggable={false} />
+          {/* 白天的雲 */}
+          {cloudData.day.map((c, i) => (
+            <img key={c.src} className="cloud" src={`garden/${c.src}`} alt="" draggable={false}
+              style={{ left: px(c.x), top: py(c.y), width: px(c.w), height: py(c.h), opacity: 1 - light.stars, animationDuration: `${46 + i * 9}s`, animationDelay: `${-i * 13}s` }} />
+          ))}
           {light.stars > 0 && <img className="scene-bg night-sky" src="garden/night-sky.webp" alt="" draggable={false} style={{ opacity: light.stars }} />}
+          {/* 夜晚的雲 */}
+          {light.stars > 0 && cloudData.night.map((c, i) => (
+            <img key={c.src} className="cloud night" src={`garden/${c.src}`} alt="" draggable={false}
+              style={{ left: px(c.x), top: py(c.y), width: px(c.w), height: py(c.h), opacity: light.stars, animationDuration: `${38 + (i % 3) * 11}s`, animationDelay: `${-i * 7}s` }} />
+          ))}
           {/* 大樹的樹冠分成 4 叢，各自隨風擺動 */}
           {[0, 1, 2, 3].map((k) => (
             <img key={k} className={`scene-tree t${k}`} src={`garden/tree-${k}.webp`} alt="" draggable={false} style={{ left: 0, top: 0, width: px(860), height: py(360) }} />

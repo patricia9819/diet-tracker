@@ -740,3 +740,10 @@ body:has(.garden-app) { background: var(--gp-bg); }
   background: radial-gradient(closest-side, rgba(70, 45, 25, .32), rgba(70, 45, 25, .12) 60%, transparent); }
 .scene-wrap .today-tag { font-size: 9px; padding: 0 6px; opacity: .85; }
 @media (prefers-reduced-motion: reduce) { .scene-wrap .plant img { animation: none; transform: rotate(var(--r, 0deg)); } }
+
+/* 雲緩緩左右飄 */
+.scene .cloud { position: absolute; max-width: none; pointer-events: none; z-index: 3; animation: cloudDrift 46s ease-in-out infinite alternate;
+  filter: drop-shadow(0 4px 3px rgba(150, 110, 95, .22)); transition: opacity 3s; }
+.scene .cloud.night { filter: drop-shadow(0 4px 4px rgba(25, 25, 55, .35)); }
+@keyframes cloudDrift { from { transform: translateX(-2.6%); } to { transform: translateX(2.6%); } }
+@media (prefers-reduced-motion: reduce) { .scene .cloud { animation: none; } }
