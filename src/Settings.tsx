@@ -1,15 +1,23 @@
 import { useRef, useState } from 'react'
-import { getApiKey, setApiKey, type useStore } from './store'
+import type { useStore } from './store'
+import { ask, toast } from './dialogs'
+import { useCap } from './platform'
 import { DIETS, type AppData, type DietType, type Profile } from './types'
 import { ACTIVITY_LEVELS, sortedWeights, targets, todayISO } from './util'
 import { badges } from './habits'
-import { buildIcs, DEFAULT_REMINDERS } from './reminders'
 
 type Store = ReturnType<typeof useStore>
 
-function download(name: string, text: string, type: string) {
+/** 存檔：Claude 頁面用 downloads 功能，其他地方用一般下載 */
+async function download(name: string, text: string) {
+  const dl = await useCap<{ save: (r: { filename: string; data: string }) => Promise<unknown> }>('downloads')
+  if (dl) {
+    try { await dl.save({ filename: name, data: text }); toast('已匯出備份') }
+    catch (e) { const c = (e as { code?: string }).code; if (c !== 'declined') toast(c === 'host_unavailable' ? '這個 App 無法存檔，請改用瀏覽器打開 claude.ai。' : '匯出失敗，請再試一次。') }
+    return
+  }
   const a = document.createElement('a')
-  a.href = URL.createObjectURL(new Blob([text], { type }))
+  a.href = URL.createObjectURL(new Blob([text], { type: 'application/json' }))
   a.download = name
   a.click()
   setTimeout(() => URL.revokeObjectURL(a.href), 1000)
@@ -28,7 +36,7 @@ export default function Settings({ store, onboarding }: { store: Store; onboardi
     goalWeight: String(p?.goalWeight ?? ''),
     weeklyLossKg: p?.weeklyLossKg ?? 0.5,
     diet: (p?.diet ?? 'lacto-ovo') as DietType,
-    fiveSpices: p?.fiveSpices ?? true,
+    fiveSpices: p?.fiveSpices ?? false,
     exerciseAddBack: p?.exerciseAddBack ?? 0.5
   })
   const fileRef = useRef<HTMLInputElement>(null)
@@ -51,7 +59,7 @@ export default function Settings({ store, onboarding }: { store: Store; onboardi
   const preview = built ? targets(built.profile, built.kg) : null
 
   const save = () => {
-    if (!built) return alert('請把資料填完整')
+    if (!built) return toast('請把身高、體重、目標和出生年填完整')
     update((d) => {
       const latest = sortedWeights(d.weights).pop()
       const weights = latest?.kg === built.kg
@@ -59,22 +67,24 @@ export default function Settings({ store, onboarding }: { store: Store; onboardi
         : [...d.weights.filter((w) => w.date !== todayISO()), { date: todayISO(), kg: built.kg }]
       return { ...d, profile: built.profile, weights }
     })
-    if (!onboarding) alert('已儲存')
+    if (!onboarding) toast('已儲存')
   }
 
-  const exportData = () => download(`減重紀錄備份-${todayISO()}.json`, JSON.stringify(data, null, 2), 'application/json')
+  const exportData = () => download(`減重紀錄備份-${todayISO()}.json`, JSON.stringify(data, null, 2))
 
   const importData = async (file: File) => {
     try {
       const d = JSON.parse(await file.text()) as AppData
       if (d.version !== 1 || !Array.isArray(d.logs) || !Array.isArray(d.weights)) throw new Error()
-      if (confirm('匯入會覆蓋目前手機裡的所有資料，確定嗎？')) replace(d)
+      if (await ask('匯入會用備份檔取代目前所有的紀錄，確定嗎？', '匯入')) { replace(d); toast('已匯入備份') }
     } catch {
-      alert('檔案格式不正確')
+      toast('檔案格式不正確，請選擇從這個 App 匯出的 .json 備份檔')
     }
   }
 
-  const delCustom = (id: string) => update((d) => ({ ...d, customFoods: d.customFoods.filter((c) => c.id !== id) }))
+  const delCustom = async (id: string, name: string) => {
+    if (await ask(`從我的食物刪除「${name}」？`, '刪除')) update((d) => ({ ...d, customFoods: d.customFoods.filter((c) => c.id !== id) }))
+  }
   const veg = f.diet !== 'omnivore'
 
   return (
@@ -143,8 +153,6 @@ export default function Settings({ store, onboarding }: { store: Store; onboardi
 
       {!onboarding && (
         <>
-          <AiKey />
-          <Reminders store={store} />
 
           <section className="card">
             <b>我的食物</b>
@@ -152,14 +160,19 @@ export default function Settings({ store, onboarding }: { store: Store; onboardi
             {data.customFoods.map((c) => (
               <div className="log" key={c.id}>
                 <div><div>{c.name}</div><small className="muted">{c.unit}・{c.kcal} 大卡{c.barcode ? '・🔍 條碼' : ''}</small></div>
-                <button className="del" onClick={() => delCustom(c.id)} aria-label="刪除">✕</button>
+                <button className="del" onClick={() => delCustom(c.id, c.name)} aria-label="刪除">✕</button>
               </div>
             ))}
           </section>
 
           <section className="card">
             <b>備份</b>
-            <p className="muted">資料只存在這支手機裡。建議每隔一段時間匯出備份，換手機時再匯入。（API 金鑰不會被匯出）</p>
+            <p className="muted">
+              {store.status === 'cloud'
+                ? '紀錄存在你 Claude 帳號的私人空間，只有你看得到，換手機登入同一個帳號也會在。也可以匯出一份備份檔自己保存。'
+                : '紀錄只存在這個瀏覽器裡，建議定期匯出備份。'}
+              舊版 App 匯出的備份檔也可以在這裡匯入。
+            </p>
             <div className="row">
               <button className="ghost" onClick={exportData}>匯出備份</button>
               <button className="ghost" onClick={() => fileRef.current?.click()}>匯入備份</button>
@@ -191,72 +204,6 @@ function Badges({ data }: { data: AppData }) {
         ))}
       </div>
       <button className="add" onClick={() => setOpen(!open)}>{open ? '收起' : '看全部徽章'}</button>
-    </section>
-  )
-}
-
-function AiKey() {
-  const [key, setKey] = useState(getApiKey())
-  const [edit, setEdit] = useState(!getApiKey())
-  const [show, setShow] = useState(false)
-  const saved = getApiKey()
-  return (
-    <section className="card">
-      <b>🤖 AI 設定</b>
-      <p className="muted small">
-        拍照辨識、讀營養標示和 AI 建議需要 Claude API 金鑰（依用量付費，每次辨識約台幣 1 元左右）。
-        金鑰只存在這支手機上，不會被匯出。
-        到 <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noreferrer">console.anthropic.com</a> 建立金鑰並儲值後貼上即可。
-      </p>
-      {edit ? (
-        <>
-          <div className="row">
-            <input className="search grow" type={show ? 'text' : 'password'} value={key} onChange={(e) => setKey(e.target.value.trim())} placeholder="sk-ant-..." autoComplete="off" />
-            <button className="chip" onClick={() => setShow(!show)}>{show ? '隱藏' : '顯示'}</button>
-          </div>
-          <div className="row end">
-            {saved && <button className="ghost" onClick={() => { setKey(saved); setEdit(false) }}>取消</button>}
-            <button className="primary" onClick={() => { if (!key.startsWith('sk-ant-')) return alert('金鑰格式應該是 sk-ant- 開頭'); setApiKey(key); setEdit(false) }}>儲存金鑰</button>
-          </div>
-        </>
-      ) : (
-        <div className="row between">
-          <span>✅ 已設定（…{saved.slice(-4)}）</span>
-          <div className="row">
-            <button className="ghost" onClick={() => setEdit(true)}>更換</button>
-            <button className="ghost" onClick={() => { if (confirm('刪除 API 金鑰？')) { setApiKey(''); setKey(''); setEdit(true) } }}>刪除</button>
-          </div>
-        </div>
-      )}
-    </section>
-  )
-}
-
-function Reminders({ store }: { store: Store }) {
-  const { data, update } = store
-  const list = data.reminders ?? DEFAULT_REMINDERS
-  const set = (id: string, patch: Partial<(typeof list)[number]>) =>
-    update((d) => ({ ...d, reminders: (d.reminders ?? DEFAULT_REMINDERS).map((r) => (r.id === id ? { ...r, ...patch } : r)) }))
-  const appUrl = location.href.split('#')[0].split('?')[0]
-  return (
-    <section className="card">
-      <b>🔔 提醒</b>
-      <p className="muted small">
-        網頁 App 無法在背景自己跳通知，所以改用手機「行事曆」提醒：選好時間後按下方按鈕，加入行事曆，每天時間到就會通知你。
-      </p>
-      {list.map((r) => (
-        <div className="log" key={r.id}>
-          <label className="check" style={{ margin: 0 }}>
-            <input type="checkbox" checked={r.on} onChange={(e) => set(r.id, { on: e.target.checked })} /> {r.label}
-          </label>
-          <input type="time" className="time" value={r.time} onChange={(e) => e.target.value && set(r.id, { time: e.target.value })} />
-        </div>
-      ))}
-      <button className="primary block" onClick={() => download('減重紀錄提醒.ics', buildIcs(list, appUrl), 'text/calendar')}>📅 加入行事曆</button>
-      <p className="note">
-        iPhone：按下後選「加入全部」。如果從主畫面 App 按了沒反應，請改用 Safari 打開這個網址再按一次。
-        想修改時間，先到行事曆刪除舊的「減重紀錄」提醒，再重新加入。
-      </p>
     </section>
   )
 }

@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from 'react'
 import type { useStore } from './store'
-import { AI_MODEL, friendlyError, getAdvice } from './ai'
+import { friendlyError, getAdvice } from './ai'
 import { dietPrompt } from './diet'
 import { MEALS, type AppData } from './types'
 import { addDays, fmtDate, r1, sortedWeights, sumLogs, targets, todayISO } from './util'
@@ -66,19 +66,20 @@ function Md({ text }: { text: string }) {
 export default function Advice({ store }: { store: Store }) {
   const { data, update } = store
   const [busy, setBusy] = useState(false)
+  const [live, setLive] = useState('')
   const [err, setErr] = useState('')
   const [idx, setIdx] = useState(0)
   const list = [...data.advice].reverse()
   const loggedDays = new Set(data.logs.filter((l) => l.date > addDays(todayISO(), -7)).map((l) => l.date)).size
 
   const run = async () => {
-    setBusy(true); setErr('')
+    setBusy(true); setErr(''); setLive('')
     try {
-      const text = await getAdvice(dietPrompt(data.profile!), buildReport(data))
+      const text = await getAdvice(dietPrompt(data.profile!), buildReport(data), setLive)
       update((d) => ({ ...d, advice: [...d.advice, { date: todayISO(), text }].slice(-20) }))
       setIdx(0)
     } catch (e) { setErr(friendlyError(e)) }
-    setBusy(false)
+    setBusy(false); setLive('')
   }
 
   const cur = list[idx]
@@ -87,13 +88,14 @@ export default function Advice({ store }: { store: Store }) {
       <header className="top"><h1>AI 飲食建議</h1></header>
       <section className="card">
         <p className="muted small" style={{ marginTop: 0 }}>
-          AI 會參考你最近 7 天的飲食、喝水、運動和體重，並依你的飲食習慣（{data.profile?.diet === 'omnivore' || !data.profile?.diet ? '葷食' : '素食'}）給建議。
+          Claude 會參考你最近 7 天的飲食、喝水、運動和體重，並依你的飲食習慣（{data.profile?.diet === 'omnivore' || !data.profile?.diet ? '葷食' : '素食'}）給建議。
           {loggedDays < 3 && ' 目前紀錄還不多，建議記錄滿 3 天以上再產生，會比較準。'}
         </p>
-        <button className="primary block" onClick={run} disabled={busy}>{busy ? 'AI 分析中，約需 20–60 秒…' : '🤖 產生建議'}</button>
+        <button className="primary block" onClick={run} disabled={busy}>{busy ? (live ? 'Claude 正在寫建議…' : 'Claude 思考中，約 20–60 秒…') : '🤖 產生建議'}</button>
         {err && <div className="alert">{err}</div>}
       </section>
-      {cur && (
+      {busy && live && <section className="card"><Md text={live} /></section>}
+      {!busy && cur && (
         <section className="card">
           <div className="row between">
             <b>{fmtDate(cur.date)} 的建議</b>
@@ -107,7 +109,7 @@ export default function Advice({ store }: { store: Store }) {
           <Md text={cur.text} />
         </section>
       )}
-      <p className="note">建議由 AI（{AI_MODEL}）產生，僅供參考，不能取代醫師或營養師的專業建議。</p>
+      <p className="note">建議由 Claude 產生，會用到你 Claude 方案的使用額度。內容僅供參考，不能取代醫師或營養師的專業建議。</p>
     </>
   )
 }

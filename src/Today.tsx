@@ -34,7 +34,18 @@ export default function Today({ store, currentKg }: { store: Store; currentKg: n
   const left = budget - Math.round(total.kcal)
   const st = streak(data)
   const isToday = date === todayISO()
-  const noWeightToday = isToday && !data.weights.some((w) => w.date === date)
+  // 今天的小提醒：依時間提醒還沒做的事
+  const hour = new Date().getHours()
+  const has = (m: Meal) => dayLogs.some((l) => l.meal === m)
+  const todos: string[] = []
+  if (isToday) {
+    if (!data.weights.some((w) => w.date === date)) todos.push('⚖️ 還沒量體重')
+    if (hour >= 10 && !has('breakfast')) todos.push('🍳 早餐還沒記')
+    if (hour >= 14 && !has('lunch')) todos.push('🍱 午餐還沒記')
+    if (hour >= 20 && !has('dinner')) todos.push('🍲 晚餐還沒記')
+    const waterGoal = Math.min(2000, Math.max(0, (hour - 8) * 170))
+    if (hour >= 11 && (data.water[date] ?? 0) < waterGoal - 250) todos.push(`💧 水喝得有點少（建議此刻約 ${Math.round(waterGoal / 250) * 250} ml）`)
+  }
   const water = data.water[date] ?? 0
   const pct = Math.min(1, total.kcal / budget)
   const R = 54
@@ -50,10 +61,10 @@ export default function Today({ store, currentKg }: { store: Store; currentKg: n
         <h1 onClick={() => setDate(todayISO())}>{date === todayISO() ? '今天' : fmtDate(date)}</h1>
         <button className="icon" onClick={() => setDate(addDays(date, 1))} disabled={date >= todayISO()} aria-label="後一天">›</button>
       </header>
-      {isToday && (st > 0 || noWeightToday) && (
+      {isToday && (
         <div className="nudges">
           {st > 0 && <span className="pill">🔥 連續記錄 {st} 天</span>}
-          {noWeightToday && <span className="pill soft">⚖️ 今天還沒量體重</span>}
+          {todos.map((t) => <span key={t} className="pill soft">{t}</span>)}
         </div>
       )}
 

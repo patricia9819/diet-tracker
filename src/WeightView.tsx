@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { CartesianGrid, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import type { useStore } from './store'
+import { ask, toast } from './dialogs'
 import { addDays, bmi, bmiLabel, fmtDate, r1, todayISO, withMovingAvg } from './util'
 
 type Store = ReturnType<typeof useStore>
@@ -27,7 +28,7 @@ export default function WeightView({ store }: { store: Store }) {
 
   const save = () => {
     const v = parseFloat(kg)
-    if (!isFinite(v) || v < 20 || v > 400) return alert('請輸入正確的體重')
+    if (!isFinite(v) || v < 20 || v > 400) return toast('請輸入正確的體重')
     const b = parseFloat(bf)
     update((d) => ({
       ...d,
@@ -35,10 +36,11 @@ export default function WeightView({ store }: { store: Store }) {
     }))
     setKg('')
     setBf('')
+    toast('已記錄 ' + v + ' kg')
   }
 
-  const remove = (dt: string) => {
-    if (confirm(`刪除 ${fmtDate(dt)} 的紀錄？`)) update((d) => ({ ...d, weights: d.weights.filter((w) => w.date !== dt) }))
+  const remove = async (dt: string) => {
+    if (await ask(`刪除 ${fmtDate(dt)} 的體重紀錄？`, '刪除')) update((d) => ({ ...d, weights: d.weights.filter((w) => w.date !== dt) }))
   }
 
   const toGoal = last ? r1(last.avg - p.goalWeight) : null

@@ -6,6 +6,7 @@ import Exercise from './Exercise'
 import Advice from './Advice'
 import Settings from './Settings'
 import { sortedWeights } from './util'
+import { Dialogs } from './dialogs'
 
 type Tab = 'today' | 'weight' | 'exercise' | 'advice' | 'me'
 
@@ -22,11 +23,28 @@ export default function App() {
   const { data } = store
   const [tab, setTab] = useState<Tab>('today')
 
+  if (store.status === 'loading' || store.status === 'error') {
+    return (
+      <div className="app">
+        <main className="splash">
+          <div className="logo" aria-hidden="true">⚖️</div>
+          {store.status === 'loading'
+            ? <p className="muted">讀取你的紀錄…</p>
+            : <p>暫時連不上你的資料。請確認網路連線，稍後再重新打開這個頁面。</p>}
+        </main>
+      </div>
+    )
+  }
+
   if (!data.profile) {
     return (
       <div className="app">
-        <header className="top"><h1>歡迎！先建立你的資料</h1></header>
-        <main><Settings store={store} onboarding /></main>
+        <main>
+          <header className="top"><h1>歡迎！先建立你的資料</h1></header>
+          <p className="muted small">紀錄會存在你 Claude 帳號的私人空間，只有你看得到。之前的 App 有資料的話，填完後可以到「我的 → 備份」匯入。</p>
+          <Settings store={store} onboarding />
+        </main>
+        <Dialogs />
       </div>
     )
   }
@@ -38,6 +56,7 @@ export default function App() {
   return (
     <div className="app">
       <main>
+        {store.saveError && <div className="alert">{store.saveError}</div>}
         {tab === 'today' && (
           <>
             {!data.profile.diet && (
@@ -62,6 +81,7 @@ export default function App() {
           </button>
         ))}
       </nav>
+      <Dialogs />
     </div>
   )
 }

@@ -4,8 +4,9 @@ import { MEALS, type FoodItem, type Meal } from './types'
 import { BUILTIN_FOODS } from './foods'
 import { uid } from './util'
 import { allowedFood, avoidsFive, dietPrompt } from './diet'
-import { fileToJpegBase64, friendlyError, readNutritionLabel, recognizeMeal, type MealResult } from './ai'
-import { lookupBarcode, startScan } from './barcode'
+import { friendlyError, readNutritionLabel, recognizeMeal, type MealResult } from './ai'
+import { decodeBarcode } from './barcode'
+import { toast } from './dialogs'
 
 type Store = ReturnType<typeof useStore>
 type Mode = 'list' | 'pick' | 'custom' | 'photo' | 'scan'
@@ -57,7 +58,7 @@ export default function AddFood({ store, date, meal, onClose }: { store: Store; 
   const add = (f: FoodItem, s: number) => addMany([{ f, s }])
 
   const addCustom = () => {
-    if (!form.name.trim()) return alert('請輸入名稱')
+    if (!form.name.trim()) return toast('請輸入名稱')
     const f: FoodItem = {
       id: 'c' + uid(), name: form.name.trim(), unit: form.unit.trim() || '1 份',
       kcal: num(form.kcal), protein: num(form.protein), carbs: num(form.carbs), fat: num(form.fat), custom: true,
@@ -132,7 +133,7 @@ export default function AddFood({ store, date, meal, onClose }: { store: Store; 
           <>
             <div className="quick">
               <button onClick={() => setMode('photo')}><span>📷</span>拍照辨識</button>
-              <button onClick={() => setMode('scan')}><span>🔍</span>掃條碼</button>
+              <button onClick={() => setMode('scan')}><span>🔍</span>拍條碼</button>
               <button onClick={() => openCustom(emptyForm(q))}><span>✏️</span>自己輸入</button>
             </div>
             <input className="search" placeholder="搜尋食物，例如：豆干、豆漿" value={q} onChange={(e) => setQ(e.target.value)} />
@@ -178,7 +179,7 @@ function CustomForm({ form, setForm, onBack, onAdd }: { form: Form; setForm: (f:
 function PhotoMeal({ dietInfo, onBack, onAdd }: { dietInfo: string; onBack: () => void; onAdd: (x: { f: FoodItem; s: number }[]) => void }) {
   const fileRef = useRef<HTMLInputElement>(null)
   const [preview, setPreview] = useState('')
-  const [b64, setB64] = useState('')
+  const [photo, setPhoto] = useState<Blob | null>(null)
   const [hint, setHint] = useState('')
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
@@ -186,19 +187,17 @@ function PhotoMeal({ dietInfo, onBack, onAdd }: { dietInfo: string; onBack: () =
   const [sel, setSel] = useState<boolean[]>([])
   const [items, setItems] = useState<MealResult['items']>([])
 
-  const choose = async (file: File) => {
+  useEffect(() => () => { if (preview) URL.revokeObjectURL(preview) }, [preview])
+  const choose = (file: File) => {
     setErr(''); setRes(null)
-    try {
-      const data = await fileToJpegBase64(file)
-      setB64(data)
-      setPreview('data:image/jpeg;base64,' + data)
-    } catch { setErr('無法讀取這張照片') }
+    setPhoto(file)
+    setPreview(URL.createObjectURL(file))
   }
 
   const run = async () => {
     setBusy(true); setErr('')
     try {
-      const r = await recognizeMeal(b64, dietInfo, hint)
+      const r = await recognizeMeal(photo!, dietInfo, hint)
       setRes(r); setItems(r.items); setSel(r.items.map(() => true))
     } catch (e) { setErr(friendlyError(e)) }
     setBusy(false)
@@ -217,7 +216,7 @@ function PhotoMeal({ dietInfo, onBack, onAdd }: { dietInfo: string; onBack: () =
       <input ref={fileRef} type="file" accept="image/*" capture="environment" hidden onChange={(e) => e.target.files?.[0] && choose(e.target.files[0])} />
       {!preview ? (
         <div className="center" style={{ padding: '24px 0' }}>
-          <p className="muted">拍下整份餐點，AI 會辨識內容並估算熱量。</p>
+          <p className="muted">拍下整份餐點，Claude 會辨識內容並估算熱量。<br />第一次使用時，請在跳出的視窗允許這個頁面使用 Claude。</p>
           <button className="primary" onClick={() => fileRef.current?.click()}>📷 拍照或選照片</button>
         </div>
       ) : (
@@ -228,7 +227,7 @@ function PhotoMeal({ dietInfo, onBack, onAdd }: { dietInfo: string; onBack: () =
               <label className="field">補充說明（選填）<input value={hint} onChange={(e) => setHint(e.target.value)} placeholder="例如：飯只吃一半、素食自助餐" /></label>
               <div className="row end">
                 <button className="ghost" onClick={() => fileRef.current?.click()}>換一張</button>
-                <button className="primary" onClick={run} disabled={busy}>{busy ? '辨識中…' : '開始辨識'}</button>
+                <button className="primary" onClick={run} disabled={busy}>{busy ? 'Claude 辨識中，約 10–40 秒…' : '開始辨識'}</button>
               </div>
             </>
           )}
@@ -267,76 +266,67 @@ function PhotoMeal({ dietInfo, onBack, onAdd }: { dietInfo: string; onBack: () =
 function Scanner({ customFoods, dietInfo, onBack, onFound, onForm }: {
   customFoods: FoodItem[]; dietInfo: string; onBack: () => void; onFound: (f: FoodItem) => void; onForm: (f: Form) => void
 }) {
-  const videoRef = useRef<HTMLVideoElement>(null)
-  const fileRef = useRef<HTMLInputElement>(null)
+  const codeRef = useRef<HTMLInputElement>(null)
+  const labelRef = useRef<HTMLInputElement>(null)
   const [code, setCode] = useState('')
   const [manual, setManual] = useState('')
-  const [status, setStatus] = useState<'scanning' | 'looking' | 'notfound' | 'reading'>('scanning')
+  const [status, setStatus] = useState<'idle' | 'decoding' | 'notfound' | 'reading'>('idle')
   const [err, setErr] = useState('')
 
-  useEffect(() => {
-    if (code) return
-    let stop: (() => void) | undefined
-    let cancelled = false
-    if (videoRef.current) {
-      startScan(videoRef.current, (c) => setCode(c))
-        .then((ctl) => { if (cancelled) ctl.stop(); else stop = () => ctl.stop() })
-        .catch(() => setErr('無法開啟相機。請允許相機權限，或直接輸入條碼數字。'))
-    }
-    return () => { cancelled = true; stop?.() }
-  }, [code])
+  const check = (c: string) => {
+    setCode(c)
+    const mine = customFoods.find((f) => f.barcode === c)
+    if (mine) onFound(mine)
+    else setStatus('notfound')
+  }
 
-  useEffect(() => {
-    if (!code) return
-    const mine = customFoods.find((f) => f.barcode === code)
-    if (mine) return onFound(mine)
-    setStatus('looking')
-    lookupBarcode(code)
-      .then((r) => {
-        if (r) onForm(toForm(r.food, r.concern ? `⚠️ ${r.concern}` : '資料來自 Open Food Facts 公開資料庫，請對照包裝確認數值。'))
-        else setStatus('notfound')
-      })
-      .catch(() => setStatus('notfound'))
-  }, [code]) // eslint-disable-line react-hooks/exhaustive-deps
+  const fromPhoto = async (file: File) => {
+    setErr(''); setStatus('decoding')
+    const c = await decodeBarcode(file)
+    if (c) check(c)
+    else { setStatus('idle'); setErr('讀不到條碼。請靠近一點、讓條碼清楚對焦再拍一次，或直接輸入條碼下方的數字。') }
+  }
 
   const readLabel = async (file: File) => {
     setStatus('reading'); setErr('')
     try {
-      const r = await readNutritionLabel(await fileToJpegBase64(file, 1600), dietInfo)
+      const r = await readNutritionLabel(file, dietInfo)
       const notes = [
         r.vegLabel && `包裝標示：${r.vegLabel}`,
         r.concern && `⚠️ ${r.concern}`,
         r.servingsPerPackage > 1 && `本包裝共 ${r.servingsPerPackage} 份，加入後可在份數調整。`
       ].filter(Boolean).join('\n')
-      onForm({ ...toForm({ ...r, custom: true }), barcode: code || undefined, note: notes || 'AI 讀取的數值請對照包裝確認。' })
-    } catch (e) { setErr(friendlyError(e)); setStatus('notfound') }
+      onForm({ ...toForm({ ...r, custom: true }), barcode: code || r.barcode || undefined, note: notes || '請對照包裝確認 Claude 讀出的數值。' })
+    } catch (e) { setErr(friendlyError(e)); setStatus(code ? 'notfound' : 'idle') }
   }
 
   return (
     <div className="pick scroll">
-      <input ref={fileRef} type="file" accept="image/*" capture="environment" hidden onChange={(e) => e.target.files?.[0] && readLabel(e.target.files[0])} />
-      {!code && (
+      <input ref={codeRef} type="file" accept="image/*" capture="environment" hidden onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) fromPhoto(f) }} />
+      <input ref={labelRef} type="file" accept="image/*" capture="environment" hidden onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) readLabel(f) }} />
+      {(status === 'idle' || status === 'decoding') && (
         <>
-          <video ref={videoRef} className="scanner" muted playsInline />
-          <p className="muted center small">把條碼對準框內</p>
+          <div className="center" style={{ padding: '16px 0 8px' }}>
+            <p className="muted">拍下包裝上的條碼。掃過並存起來的食物，下次拍條碼就會直接找到。</p>
+            <button className="primary" onClick={() => codeRef.current?.click()} disabled={status === 'decoding'}>{status === 'decoding' ? '讀取條碼中…' : '📷 拍條碼'}</button>
+          </div>
           <div className="row">
             <input className="search grow" inputMode="numeric" placeholder="或輸入條碼數字" value={manual} onChange={(e) => setManual(e.target.value.replace(/\D/g, ''))} />
-            <button className="primary" onClick={() => manual && setCode(manual)}>查詢</button>
+            <button className="primary" onClick={() => manual && check(manual)}>查詢</button>
           </div>
         </>
       )}
-      {status === 'looking' && <p className="center">查詢條碼 {code} 中…</p>}
-      {status === 'reading' && <p className="center">AI 讀取營養標示中…</p>}
+      {status === 'reading' && <p className="center">Claude 讀取營養標示中，約 10–40 秒…</p>}
       {status === 'notfound' && (
         <div className="center" style={{ padding: '12px 0' }}>
-          <p>資料庫裡找不到條碼 {code}（台灣產品收錄較少）。</p>
-          <p className="muted">拍下包裝背面的「營養標示」，AI 會幫你讀出數值，存起來後下次掃描就能直接找到。</p>
-          <button className="primary" onClick={() => fileRef.current?.click()}>📷 拍營養標示</button>
+          <p>條碼 {code} 還沒有存過。</p>
+          <p className="muted">拍下包裝背面的「營養標示」，Claude 會幫你讀出數值。存起來後，下次拍這個條碼就會直接找到。</p>
+          <button className="primary" onClick={() => labelRef.current?.click()}>📷 拍營養標示</button>
         </div>
       )}
       {err && <div className="alert">{err}</div>}
       <div className="row end">
-        {!code && <button className="ghost" onClick={() => fileRef.current?.click()}>直接拍營養標示</button>}
+        {status === 'idle' && <button className="ghost" onClick={() => labelRef.current?.click()}>沒有條碼，直接拍營養標示</button>}
         <button className="ghost" onClick={onBack}>返回</button>
       </div>
     </div>

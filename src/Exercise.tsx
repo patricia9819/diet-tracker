@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import type { useStore } from './store'
+import { toast } from './dialogs'
 import { ACTIVITIES } from './exercise-data'
 import { addDays, fmtDate, sortedWeights, todayISO, uid } from './util'
 
@@ -23,9 +24,10 @@ export default function Exercise({ store }: { store: Store }) {
 
   const save = () => {
     const name = act === '其他' ? custom.trim() || '其他運動' : act
-    if (!kcal) return alert('請輸入時間或消耗熱量')
+    if (!kcal) return toast('請輸入時間或消耗熱量')
     update((d) => ({ ...d, exercises: [...d.exercises, { id: uid(), date, name, minutes: parseFloat(min) || 0, kcal }] }))
     setManualKcal('')
+    toast(`已記錄${name} ${kcal} 大卡`)
   }
   const remove = (id: string) => update((d) => ({ ...d, exercises: d.exercises.filter((e) => e.id !== id) }))
 
