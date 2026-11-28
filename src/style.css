@@ -9,6 +9,8 @@
   --art-bg: #ecebe5; --art-light: #fbfaf6; --art-leaf: #b6c2ad; --art-cloth: #e3e2dc; --art-shadow: rgba(60, 64, 56, .14);
   --art-bowl: #d9d2c6; --art-bowl-2: #bfb6a8; --art-rim: #e8e2d8; --art-yogurt: #faf8f3; --art-granola: #c79a5f; --art-berry: #3d4a6b; --art-berry-hi: #8d9ac0;
   --sky-1: #a9c3d6; --sky-2: #dce8ef; --cloud: #f6f8fa;
+  --pot: #c8a690; --pot-rim: #b8937c; --soil: #7d6656; --stem: #6b8a63; --leaf: #8fae84; --leaf-2: #6f9266;
+  --bud: #b9cf9f; --petal: #efc2bb; --core: #e9b65a; --water: #7fa6bd; --water-soft: #dfeaf0;
   --serif: "Noto Serif TC", "Songti TC", "Source Han Serif TC", Georgia, serif;
   --sans: -apple-system, BlinkMacSystemFont, "PingFang TC", "Noto Sans TC", "Microsoft JhengHei", sans-serif;
 }
@@ -23,6 +25,8 @@
     --art-bg: #1f221e; --art-light: #2c302a; --art-leaf: #3d4b38; --art-cloth: #262a25; --art-shadow: rgba(0, 0, 0, .35);
     --art-bowl: #5d574e; --art-bowl-2: #48433c; --art-rim: #6b655b; --art-yogurt: #e9e6df; --art-granola: #b88b52; --art-berry: #45537a; --art-berry-hi: #9aa7cc;
     --sky-1: #3e5566; --sky-2: #5f7685; --cloud: #c9d2d8;
+    --pot: #8a6f5f; --pot-rim: #7a604f; --soil: #4b3e35; --stem: #8fae84; --leaf: #8fb083; --leaf-2: #6f9266;
+    --bud: #a5bf8b; --petal: #e2a9a1; --core: #d9a54e; --water: #8fb6cc; --water-soft: #22323a;
     color-scheme: dark;
   }
 }
@@ -36,6 +40,8 @@
   --art-bg: #1f221e; --art-light: #2c302a; --art-leaf: #3d4b38; --art-cloth: #262a25; --art-shadow: rgba(0, 0, 0, .35);
   --art-bowl: #5d574e; --art-bowl-2: #48433c; --art-rim: #6b655b; --art-yogurt: #e9e6df; --art-granola: #b88b52; --art-berry: #45537a; --art-berry-hi: #9aa7cc;
   --sky-1: #3e5566; --sky-2: #5f7685; --cloud: #c9d2d8;
+  --pot: #8a6f5f; --pot-rim: #7a604f; --soil: #4b3e35; --stem: #8fae84; --leaf: #8fb083; --leaf-2: #6f9266;
+  --bud: #a5bf8b; --petal: #e2a9a1; --core: #d9a54e; --water: #8fb6cc; --water-soft: #22323a;
   color-scheme: dark;
 }
 
@@ -351,3 +357,76 @@ main > *, .block, .tiles > *, .duo > div, .trio > div, .stat-row > div { min-wid
 .stat-row b { font-size: clamp(16px, 5vw, 21px); }
 .tile-big { font-size: clamp(22px, 7vw, 26px); overflow-wrap: anywhere; }
 .insight-title { font-size: clamp(21px, 6.8vw, 26px); }
+
+/* 喝水小盆栽 */
+.plant-card { background: var(--water-soft); border-radius: 20px; padding: 16px 16px 14px; margin-bottom: 12px; position: relative; overflow: hidden; }
+.plant-top { display: flex; gap: 12px; align-items: center; }
+.plant-stage { position: relative; width: 108px; height: 124px; flex: none; }
+.plant-svg { width: 100%; height: 100%; overflow: visible; }
+.plant-info { flex: 1; min-width: 0; }
+.plant-title { display: flex; align-items: center; gap: 6px; font-family: var(--serif); font-weight: 600; font-size: 15px; letter-spacing: .03em; color: var(--accent-2); }
+.plant-ml { margin-top: 6px; font-variant-numeric: tabular-nums; }
+.plant-ml b { font-family: var(--serif); font-weight: 500; font-size: clamp(26px, 8vw, 32px); }
+.plant-ml span { font-size: 13px; color: var(--muted); }
+.plant-bar { height: 6px; border-radius: 99px; background: color-mix(in srgb, var(--water) 22%, transparent); overflow: hidden; margin-top: 6px; }
+.plant-bar span { display: block; height: 100%; background: var(--water); border-radius: 99px; transition: width .6s cubic-bezier(.3, 1.4, .5, 1); }
+.bloomed .plant-bar span { background: var(--accent); }
+.plant-msg { margin: 8px 0 0; font-size: 13.5px; line-height: 1.5; color: var(--text); }
+.thirsty .plant-msg { color: var(--warn); }
+
+.plant-svg .pot { fill: var(--pot); }
+.plant-svg .pot-rim { fill: var(--pot-rim); }
+.plant-svg .soil { fill: var(--soil); }
+.plant-svg .seed { fill: var(--pot-rim); }
+.plant-svg .stem { fill: none; stroke: var(--stem); stroke-width: 3; stroke-linecap: round; transition: d .6s ease; }
+.plant-svg .leaf { fill: var(--leaf); stroke: var(--leaf-2); stroke-width: .8; transform: scale(0); opacity: 0; transition: transform .6s cubic-bezier(.3, 1.6, .5, 1), opacity .4s, fill .4s; }
+.plant-svg .leaf.show { transform: scale(1); opacity: 1; }
+.plant-svg .bud { fill: var(--bud); stroke: var(--leaf-2); stroke-width: .8; animation: pop .5s cubic-bezier(.3, 1.6, .5, 1); transform-origin: center; transform-box: fill-box; }
+.plant-svg .petal { fill: var(--petal); }
+.plant-svg .core { fill: var(--core); }
+.plant-svg .flower { animation: bloom .9s cubic-bezier(.3, 1.5, .5, 1); }
+.plant-sway { transform-origin: 60px 98px; animation: sway 4.5s ease-in-out infinite; }
+.plant-sway.bounce { animation: hop .55s cubic-bezier(.3, 1.6, .5, 1), sway 4.5s ease-in-out .55s infinite; }
+.plant-sway.droop { animation: none; transform: rotate(-7deg); }
+.plant-sway.droop .leaf.show { transform: scale(1) rotate(16deg); fill: color-mix(in srgb, var(--leaf) 60%, var(--pot)); }
+
+.drop-wrap { position: absolute; left: 50%; top: 0; width: 0; height: 100%; animation: life 1.3s linear forwards; pointer-events: none; }
+.drop { position: absolute; left: -6px; top: 0; width: 12px; height: 16px; background: var(--water); border-radius: 50% 50% 50% 50% / 62% 62% 38% 38%; animation: fall .55s cubic-bezier(.55, 0, .9, .5) forwards; }
+.ripple { position: absolute; left: -22px; top: 63%; width: 44px; height: 10px; border: 2px solid var(--water); border-radius: 50%; opacity: 0; animation: ripple .7s ease-out .5s forwards; }
+.float-ml { position: absolute; left: 14px; top: 34%; font-family: var(--serif); font-weight: 600; font-size: 15px; color: var(--water); white-space: nowrap; opacity: 0; animation: floatUp 1s ease-out .45s forwards; }
+.petals { position: absolute; left: 50%; top: 22%; width: 0; height: 0; pointer-events: none; }
+.petals i { position: absolute; width: 8px; height: 11px; margin: -5px 0 0 -4px; border-radius: 50%; background: var(--petal); animation: burst 1.2s ease-out forwards; transform: rotate(var(--a)); }
+
+.timeline { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; margin-top: 14px; padding-top: 12px; border-top: 1px dashed color-mix(in srgb, var(--water) 40%, transparent); }
+.slot { display: flex; flex-direction: column; align-items: center; gap: 3px; }
+.slot .dot { width: 26px; height: 26px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; color: color-mix(in srgb, var(--water) 45%, transparent); background: var(--card); transition: background .3s, color .3s; }
+.slot.on .dot { background: var(--water); color: #fff; }
+.slot.now .dot { box-shadow: 0 0 0 2px var(--water); }
+.slot.miss .dot { opacity: .55; }
+.slot small { font-size: 10.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
+
+.water-btns { display: grid; grid-template-columns: 40px 1fr 1fr 1fr; gap: 8px; margin-top: 14px; }
+.wb { height: 42px; border-radius: 12px; background: var(--card); display: inline-flex; align-items: center; justify-content: center; gap: 5px; font-size: 14px; font-variant-numeric: tabular-nums; color: var(--text); transition: transform .12s; }
+.wb:active { transform: scale(.94); }
+.wb.cup { background: var(--water); color: #fff; font-weight: 600; }
+.wb.undo { color: var(--muted); }
+
+.weight-row { width: 100%; display: flex; align-items: center; gap: 12px; padding: 14px 16px; border-radius: 16px; background: var(--card); border: 1px solid var(--line); margin-bottom: 6px; text-align: left; }
+.weight-row svg:first-child { color: var(--muted); }
+.weight-val { font-family: var(--serif); font-size: 22px; font-variant-numeric: tabular-nums; }
+.weight-val small { font-size: 13px; margin-left: 3px; }
+
+@keyframes sway { 0%, 100% { transform: rotate(-1.5deg); } 50% { transform: rotate(1.5deg); } }
+@keyframes hop { 0% { transform: scale(1, 1); } 35% { transform: scale(1.06, .92); } 70% { transform: scale(.97, 1.06); } 100% { transform: scale(1, 1); } }
+@keyframes pop { from { transform: scale(0); } to { transform: scale(1); } }
+@keyframes bloom { 0% { transform: scale(0) rotate(-40deg); } 100% { transform: scale(1) rotate(0); } }
+@keyframes fall { 0% { transform: translateY(-10px); opacity: 0; } 15% { opacity: 1; } 100% { transform: translateY(66px) scale(.7, .9); opacity: 1; } }
+@keyframes ripple { 0% { transform: scale(.3); opacity: .9; } 100% { transform: scale(1.4); opacity: 0; } }
+@keyframes floatUp { 0% { transform: translateY(8px); opacity: 0; } 25% { opacity: 1; } 100% { transform: translateY(-22px); opacity: 0; } }
+@keyframes burst { 0% { transform: rotate(var(--a)) translateY(0) scale(.4); opacity: 1; } 100% { transform: rotate(var(--a)) translateY(-46px) scale(1); opacity: 0; } }
+@keyframes life { to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) {
+  .plant-sway, .plant-sway.bounce, .plant-svg .flower, .plant-svg .bud { animation: none; }
+  .drop, .ripple, .float-ml, .petals i { animation-duration: .01s; }
+  .plant-svg .leaf { transition: none; }
+}

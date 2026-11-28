@@ -24,6 +24,7 @@ export interface Profile {
   stepGoal?: number
   waterGoal?: number
   reminders?: { weight: boolean; meals: boolean; water: boolean }
+  cups?: number[] // 常用杯子容量（ml）
 }
 
 export interface WeightEntry {
@@ -96,6 +97,7 @@ export interface AppData {
   exercises: ExerciseEntry[]
   advice: Advice[]
   steps: Record<string, StepDay> // date -> 步數
+  waterLog?: Record<string, [number, number][]> // date -> [當天第幾分鐘, ml]，畫喝水時間軸用
   photos: Record<string, Partial<Record<Meal, string>>> // date -> 餐點縮圖（data URL）
 }
 

@@ -18,13 +18,14 @@ function split(d: AppData): Docs {
   const docs: Docs = { main: { profile: d.profile, customFoods: d.customFoods, advice: d.advice } }
   const m = (date: string) => {
     const k = 'm-' + date.slice(0, 7)
-    return (docs[k] ??= { logs: [], weights: [], water: {}, exercises: [], steps: {} }) as { logs: unknown[]; weights: unknown[]; water: Record<string, number>; exercises: unknown[]; steps: Record<string, unknown> }
+    return (docs[k] ??= { logs: [], weights: [], water: {}, exercises: [], steps: {}, waterLog: {} }) as { logs: unknown[]; weights: unknown[]; water: Record<string, number>; exercises: unknown[]; steps: Record<string, unknown>; waterLog: Record<string, unknown> }
   }
   for (const l of d.logs) m(l.date).logs.push(l)
   for (const w of d.weights) m(w.date).weights.push(w)
   for (const e of d.exercises) m(e.date).exercises.push(e)
   for (const [date, ml] of Object.entries(d.water)) m(date).water[date] = ml
   for (const [date, st] of Object.entries(d.steps ?? {})) m(date).steps[date] = st
+  for (const [date, wl] of Object.entries(d.waterLog ?? {})) if (wl.length) m(date).waterLog[date] = wl
   // 餐點縮圖一天一份文件，避免每月文件太大
   for (const [date, ph] of Object.entries(d.photos ?? {})) if (ph && Object.keys(ph).length) docs['p-' + date] = { ...ph }
   return docs
@@ -47,6 +48,7 @@ function join(docs: Docs): AppData {
     d.exercises.push(...(m.exercises ?? []))
     Object.assign(d.water, m.water ?? {})
     Object.assign(d.steps, m.steps ?? {})
+    d.waterLog = { ...d.waterLog, ...(m.waterLog ?? {}) }
   }
   return d
 }

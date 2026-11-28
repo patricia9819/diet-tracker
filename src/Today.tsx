@@ -8,6 +8,7 @@ import { dayActivity } from './activity'
 import { Icon } from './icons'
 import { Bar, DateButton, PageHead, fmt } from './ui'
 import { ask } from './dialogs'
+import WaterPlant from './WaterPlant'
 
 type Store = ReturnType<typeof useStore>
 
@@ -31,8 +32,6 @@ export default function Today({ store, currentKg, goBody }: { store: Store; curr
   const budget = t.kcal + act.bonus
   const left = budget - Math.round(total.kcal)
   const isToday = date === todayISO()
-  const waterGoal = p.waterGoal ?? 2000
-  const water = data.water[date] ?? 0
   const rem = p.reminders ?? { weight: true, meals: true, water: true }
 
   // 今天的小提醒
@@ -44,8 +43,6 @@ export default function Today({ store, currentKg, goBody }: { store: Store; curr
     if (rem.meals && hour >= 10 && !has('breakfast')) todos.push({ icon: 'egg', text: '早餐還沒記' })
     if (rem.meals && hour >= 14 && !has('lunch')) todos.push({ icon: 'bowl', text: '午餐還沒記' })
     if (rem.meals && hour >= 20 && !has('dinner')) todos.push({ icon: 'leaf', text: '晚餐還沒記' })
-    const should = Math.min(waterGoal, Math.max(0, ((hour - 8) / 12) * waterGoal))
-    if (rem.water && hour >= 11 && water < should - 200) todos.push({ icon: 'drop', text: `水喝得有點少，此刻建議約 ${Math.round(should / 100) * 100} ml` })
   }
   const st = streak(data)
 
@@ -55,7 +52,6 @@ export default function Today({ store, currentKg, goBody }: { store: Store; curr
   const wPrev = wToday ? ws[ws.length - 2] : null
   const delta = wToday && wPrev ? r1(wToday.kg - wPrev.kg) : null
 
-  const setWater = (ml: number) => update((d) => ({ ...d, water: { ...d.water, [date]: Math.max(0, ml) } }))
   const removeLog = async (id: string, name: string) => {
     if (await ask(`刪除「${name}」？`, '刪除')) update((d) => ({ ...d, logs: d.logs.filter((l) => l.id !== id) }))
   }
@@ -102,28 +98,19 @@ export default function Today({ store, currentKg, goBody }: { store: Store; curr
         ))}
       </section>
 
-      <section className="tiles">
-        <div className="tile">
-          <div className="tile-head"><Icon name="cup" size={20} /><b>飲水</b></div>
-          <div className="tile-val">{fmt(water)} / {fmt(waterGoal)} ml</div>
-          <Bar value={water} max={waterGoal} tone="blue" />
-          <div className="tile-actions">
-            <button className="mini" onClick={() => setWater(water - 100)} disabled={water <= 0} aria-label="減少 100 毫升"><Icon name="minus" size={16} /></button>
-            <button className="mini fill" onClick={() => setWater(water + 100)}>+100 ml</button>
-          </div>
-        </div>
-        <button className="tile" onClick={goBody}>
-          <div className="tile-head"><Icon name="scale" size={20} /><b>{isToday ? '今日體重' : '當日體重'}</b></div>
-          {wToday ? (
-            <>
-              <div className="tile-big">{wToday.kg}<span className="unit">kg</span></div>
-              {delta !== null && delta !== 0 && <div className={delta < 0 ? 'delta down' : 'delta up'}>{delta < 0 ? '▼' : '▲'} {delta > 0 ? '+' : ''}{delta} kg</div>}
-            </>
-          ) : (
-            <div className="tile-empty">尚未記錄<span>前往記錄 <Icon name="chevron" size={14} /></span></div>
-          )}
-        </button>
-      </section>
+      <WaterPlant store={store} date={date} />
+
+      <button className="weight-row" onClick={goBody}>
+        <Icon name="scale" size={22} />
+        <span className="grow">{isToday ? '今日體重' : '當日體重'}</span>
+        {wToday ? (
+          <>
+            <span className="weight-val">{wToday.kg}<small>kg</small></span>
+            {delta !== null && delta !== 0 && <span className={delta < 0 ? 'delta down' : 'delta up'}>{delta < 0 ? '▼' : '▲'} {delta > 0 ? '+' : ''}{delta}</span>}
+          </>
+        ) : <span className="muted small">尚未記錄</span>}
+        <Icon name="chevron" size={18} className="chev" />
+      </button>
 
       <section className="block">
         <div className="sec-row">

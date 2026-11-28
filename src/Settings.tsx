@@ -156,19 +156,23 @@ export function ProfileForm({ store, onboarding, onDone }: { store: Store; onboa
     fiveSpices: p?.fiveSpices ?? false,
     exerciseAddBack: p?.exerciseAddBack ?? 0.5,
     stepGoal: String(p?.stepGoal ?? 8000),
-    waterGoal: String(p?.waterGoal ?? 2000)
+    waterGoal: String(p?.waterGoal ?? 2000),
+    cup1: String(p?.cups?.[0] ?? 800),
+    cup2: String(p?.cups?.[1] ?? 1100)
   })
 
   const build = (): { profile: Profile; kg: number } | null => {
     const h = parseFloat(f.heightCm), g = parseFloat(f.goalWeight), y = parseInt(f.birthYear), kg = parseFloat(f.currentKg)
     if (!(h > 100 && h < 250) || !(g > 20 && g < 400) || !(y > 1920 && y <= new Date().getFullYear() - 10) || !(kg > 20 && kg < 400)) return null
     const sg = parseInt(f.stepGoal), wg = parseInt(f.waterGoal)
+    const cups = [parseInt(f.cup1), parseInt(f.cup2)].filter((c) => c >= 50 && c <= 3000)
     return {
       profile: {
         ...(p ?? {}),
         sex: f.sex as Profile['sex'], birthYear: y, heightCm: h, activity: f.activity, goalWeight: g, weeklyLossKg: f.weeklyLossKg,
         diet: f.diet, fiveSpices: f.fiveSpices, exerciseAddBack: f.exerciseAddBack,
-        stepGoal: sg >= 1000 && sg <= 50000 ? sg : 8000, waterGoal: wg >= 500 && wg <= 5000 ? wg : 2000
+        stepGoal: sg >= 1000 && sg <= 50000 ? sg : 8000, waterGoal: wg >= 500 && wg <= 5000 ? wg : 2000,
+        cups: cups.length ? cups : [800, 1100]
       },
       kg
     }
@@ -228,6 +232,8 @@ export function ProfileForm({ store, onboarding, onDone }: { store: Store; onboa
       <div className="grid2">
         <label className="field">每日步數目標<input inputMode="numeric" value={f.stepGoal} onChange={(e) => setF({ ...f, stepGoal: e.target.value.replace(/\D/g, '') })} /></label>
         <label className="field">每日喝水（ml）<input inputMode="numeric" value={f.waterGoal} onChange={(e) => setF({ ...f, waterGoal: e.target.value.replace(/\D/g, '') })} /></label>
+        <label className="field">常用杯子 1（ml）<input inputMode="numeric" value={f.cup1} onChange={(e) => setF({ ...f, cup1: e.target.value.replace(/\D/g, '') })} /></label>
+        <label className="field">常用杯子 2（ml）<input inputMode="numeric" value={f.cup2} onChange={(e) => setF({ ...f, cup2: e.target.value.replace(/\D/g, '') })} /></label>
       </div>
       <label className="field">平常的活動量（不含另外記錄的步數與運動）
         <select value={f.activity} onChange={(e) => setF({ ...f, activity: parseFloat(e.target.value) })}>
@@ -264,7 +270,7 @@ function Reminders({ store }: { store: Store }) {
   const rows: { k: keyof typeof r; icon: string; label: string; desc: string }[] = [
     { k: 'weight', icon: 'scale', label: '量體重', desc: '當天還沒記錄體重時提醒' },
     { k: 'meals', icon: 'bowl', label: '記錄三餐', desc: '10 點、14 點、20 點後還沒記錄時提醒' },
-    { k: 'water', icon: 'drop', label: '喝水', desc: '依時間比較喝水進度，落後時提醒' }
+    { k: 'water', icon: 'sprout', label: '小盆栽口渴提醒', desc: '喝水進度落後時，小盆栽會垂下葉子提醒你' }
   ]
   return (
     <>
