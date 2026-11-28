@@ -2,13 +2,13 @@ import manifest from '../public/flowers/manifest.json'
 import type { AppData } from './types'
 import { addDays, todayISO } from './util'
 
-export interface Flower { id: string; name: string; words: string; group: number; sizes: [number, number][] }
+export interface Flower { id: string; name: string; words: string; group: number; sizes: [number, number][]; gsizes?: [number, number][] }
 export const FLOWERS = manifest.flowers as Flower[]
 export const GROUPS = manifest.groups as string[]
 export const STAGES = ['種子', '花苗', '成長 50%', '成長 75%', '成花']
 const byId = new Map(FLOWERS.map((f) => [f.id, f]))
 export const flowerOf = (id: string | undefined) => (id ? byId.get(id) : undefined)
-export const flowerSrc = (id: string, stage: number | 'p') => `flowers/${id}-${stage}.webp`
+export const flowerSrc = (id: string, stage: number | 'p' | 'g2' | 'g3' | 'g4') => `flowers/${id}-${stage}.webp`
 
 /** 喝水比例 → 生長階段：0 種子、1 花苗、2 成長 50%、3 成長 75%、4 成花；沒喝水是 -1（空土） */
 export const stageOf = (water: number, goal: number) => {

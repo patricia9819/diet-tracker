@@ -13,11 +13,27 @@ const px = (x: number) => `${(x / W) * 100}%`
 const py = (y: number) => `${(y / H) * 100}%`
 
 /** 一小叢：同一種花種 3 株，前後錯開 */
-const CLUMP = [
-  { dx: -36, dy: -9, k: 0.82, flip: false },
-  { dx: 34, dy: -5, k: 0.88, flip: true },
-  { dx: -2, dy: 10, k: 1, flip: false }
-]
+/** 依日期產生固定的亂數，每次打開花園，同一天的花叢長得都一樣 */
+function rng(seed: string) {
+  let h = 2166136261
+  for (const c of seed) h = Math.imul(h ^ c.charCodeAt(0), 16777619)
+  return () => ((h = Math.imul(h ^ (h >>> 15), 2246822507) ^ Math.imul(h ^ (h >>> 13), 3266489909)) >>> 0) / 4294967296
+}
+/** 一叢花：後排 2 株花苞、前面 4–5 株盛開，大小、角度、方向都不同，前後交錯 */
+function clump(date: string) {
+  const r = rng(date)
+  const stems: { dx: number; dy: number; k: number; rot: number; flip: boolean; st: 2 | 3 | 4 }[] = []
+  const put = (st: 2 | 3 | 4, ring: number, dyBase: number, size: number, ang: number) => {
+    const rad = ring * (0.75 + r() * 0.35)
+    stems.push({ dx: Math.cos(ang) * 64 * rad, dy: dyBase + Math.sin(ang) * 18 * rad, k: size * (0.85 + r() * 0.28), rot: (r() - 0.5) * 12, flip: r() < 0.5, st })
+  }
+  // 外圍一圈綠葉打底、後排花苞，再把 5–6 朵盛開的花放在中間偏前
+  for (let i = 0; i < 4; i++) put(2, 1, 2, 0.6, (i / 4) * Math.PI * 2 + r())
+  for (let i = 0; i < 2; i++) put(3, 0.6, -14, 0.6, Math.PI + (i - 0.5) * 1.4 + r() * 0.4)
+  const n = 5 + Math.floor(r() * 2)
+  for (let i = 0; i < n; i++) put(4, i === 0 ? 0 : 0.62, 0, 0.66, (i / n) * Math.PI * 2 + r() * 0.8)
+  return stems
+}
 
 // 一天中的光線：[分鐘, 色調 r, g, b, 濃度, 燈光, 星星]
 const KEYS: [number, number, number, number, number, number, number][] = [
@@ -85,14 +101,31 @@ export default function GardenScene({ store }: { store: Store }) {
   const sun = sunP >= 0 && sunP <= 1 ? { x: 980 + 520 * sunP, y: 230 - Math.sin(Math.PI * sunP) * 190 } : null
   const moon = moonP >= 0 && moonP <= 1 ? { x: 1250 + 190 * moonP, y: 150 - Math.sin(Math.PI * moonP) * 62 } : null   // 留在右上方的夜空，不壓到溫室屋頂
 
-  type Item = { key: string; f: Flower; stage: number; x: number; y: number; k: number; flip: boolean; label: string; delay: number; today?: boolean }
+  type Item = { key: string; group: string; src: string; w: number; h: number; x: number; y: number; rot: number; flip: boolean; label: string; delay: number; back?: boolean; lead?: boolean; today?: boolean }
   const items: Item[] = []
+  const shadows: { key: string; x: number; y: number; s: number }[] = []
   planted.forEach((p, i) => {
     const label = `${p.f.name}・${fmtDate(p.date).replace(/（.）/, '')} 開花`
-    CLUMP.forEach((c, j) => items.push({ key: `${p.date}-${j}`, f: p.f, stage: 4, x: p.spot.x + c.dx * p.spot.s, y: p.spot.y + c.dy * p.spot.s, k: p.spot.s * c.k * 0.78, flip: c.flip, label, delay: (i * 530 + j * 270) % 4000 }))
+    const g = p.f.gsizes
+    shadows.push({ key: p.date, x: p.spot.x, y: p.spot.y + 4, s: p.spot.s * 1.25 })
+    clump(p.date).forEach((c, j) => {
+      const st = c.st
+      const [w, h] = g ? g[st - 2] : p.f.sizes[st]
+      const depth = 1 + c.dy / 160
+      const k = p.spot.s * c.k * depth
+      items.push({
+        key: `${p.date}-${j}`, group: p.date, src: g ? flowerSrc(p.f.id, `g${st}` as 'g2' | 'g3' | 'g4') : flowerSrc(p.f.id, st),
+        w: w * k, h: h * k, x: p.spot.x + c.dx * p.spot.s, y: p.spot.y + c.dy * p.spot.s + 6, rot: c.rot, flip: c.flip,
+        label, delay: (i * 530 + j * 370) % 4200, back: st < 4, lead: j === 6
+      })
+    })
   })
   if (todayFlower && todayStage >= 0) {
-    items.push({ key: 'today', f: todayFlower, stage: todayStage, x: todaySpot.x, y: todaySpot.y + 8, k: todaySpot.s * (todayStage === 0 ? 1.4 : 0.9), flip: false, label: `今天的${todayFlower.name}・${STAGES[todayStage]}`, delay: 0, today: true })
+    const useG = todayStage >= 3 && todayFlower.gsizes
+    const [w, h] = useG ? todayFlower.gsizes![todayStage - 2] : todayFlower.sizes[todayStage]
+    const k = todaySpot.s * (todayStage === 0 ? 1.4 : useG ? 0.62 : 0.85)
+    if (todayStage >= 1) shadows.push({ key: 'today', x: todaySpot.x, y: todaySpot.y + 8, s: todaySpot.s * 0.6 })
+    items.push({ key: 'today', group: 'today', src: useG ? flowerSrc(todayFlower.id, `g${todayStage}` as 'g3' | 'g4') : flowerSrc(todayFlower.id, todayStage), w: w * k, h: h * k, x: todaySpot.x, y: todaySpot.y + 10, rot: 0, flip: false, label: `今天的${todayFlower.name}・${STAGES[todayStage]}`, delay: 0, lead: true, today: true })
   }
   items.sort((a, b) => a.y - b.y)
 
@@ -116,17 +149,18 @@ export default function GardenScene({ store }: { store: Store }) {
             <span key={i} className="water-fall" style={{ left: px(x), top: py(y), height: py(h), animationDelay: `${-i * 0.23}s` }} aria-hidden="true" />
           ))}
 
+          {shadows.map((sh) => (
+            <span key={'sh' + sh.key} className="clump-shadow" style={{ left: px(sh.x), top: py(sh.y), width: px(130 * sh.s), height: py(34 * sh.s), zIndex: Math.round(sh.y) - 40 }} aria-hidden="true" />
+          ))}
           {items.map((it) => {
-            const [w, h] = it.f.sizes[it.stage]
-            const group = it.today ? 'today' : it.key.slice(0, 10)   // 同一天的 3 株一起晃
-            const active = poke?.key === group
+            const active = poke?.key === it.group
             return (
-              <button key={it.key} className={'plant' + (active ? ' poked' : '') + (it.today ? ' is-today' : '')}
-                style={{ left: px(it.x), top: py(it.y), width: px(w * it.k), height: py(h * it.k), animationDelay: `${it.delay}ms`, zIndex: Math.round(it.y) }}
-                onClick={() => tap(group)} aria-label={it.label}>
-                <img key={active ? poke!.n : 0} src={flowerSrc(it.f.id, it.stage)} alt="" draggable={false} style={it.flip ? { scale: '-1 1' } : undefined} />
+              <button key={it.key} className={'plant' + (active ? ' poked' : '') + (it.today ? ' is-today' : '') + (it.back ? ' back' : '')}
+                style={{ left: px(it.x), top: py(it.y), width: px(it.w), height: py(it.h), animationDelay: `${it.delay}ms`, zIndex: Math.round(it.y) }}
+                onClick={() => tap(it.group)} aria-label={it.label}>
+                <img key={active ? poke!.n : 0} src={it.src} alt="" draggable={false} style={{ ['--r' as string]: `${it.rot}deg`, ...(it.flip ? { scale: '-1 1' } : {}) }} />
                 <span className="hit" aria-hidden="true" />
-                {active && (it.today || it.key.endsWith('-2')) && <span className="bubble" key={'b' + poke!.n}>{it.label}</span>}
+                {active && it.lead && <span className="bubble" key={'b' + poke!.n}>{it.label}</span>}
                 {it.today && <span className="today-tag">今天</span>}
               </button>
             )

@@ -728,3 +728,15 @@ body:has(.garden-app) { background: var(--gp-bg); }
 .pot-flower.bounce { animation: hop .55s cubic-bezier(.3, 1.6, .5, 1), flowerSway 3.6s ease-in-out .55s infinite; }
 .pot-flower.droop { transform: none; animation: flowerSway 5.5s ease-in-out infinite; }
 .pot-flower .sprite { margin: 0 auto; }
+
+/* 自然花圃：每株各自搖曳（帶自己的角度），後排花苞小一點、淡一點，花叢底下有柔和陰影 */
+.scene-wrap .plant img { transform-origin: 50% 100%; animation: stemSway 4.4s ease-in-out infinite alternate; animation-delay: inherit;
+  filter: saturate(.92) drop-shadow(0 2px 1.5px rgba(80, 55, 30, .22)); }
+.scene-wrap .plant.back img { filter: saturate(.82) brightness(.95) drop-shadow(0 1px 1px rgba(80, 55, 30, .18)); }
+.scene-wrap .plant.poked img { animation: stemPoke .75s cubic-bezier(.3, 1.6, .5, 1), stemSway 4.4s ease-in-out .75s infinite alternate; }
+@keyframes stemSway { from { transform: rotate(calc(var(--r, 0deg) - 2deg)); } to { transform: rotate(calc(var(--r, 0deg) + 2deg)); } }
+@keyframes stemPoke { 0% { transform: rotate(var(--r, 0deg)); } 25% { transform: rotate(calc(var(--r, 0deg) - 9deg)) scale(1.05, .95); } 55% { transform: rotate(calc(var(--r, 0deg) + 6deg)); } 100% { transform: rotate(var(--r, 0deg)); } }
+.clump-shadow { position: absolute; transform: translate(-50%, -50%); border-radius: 50%; pointer-events: none;
+  background: radial-gradient(closest-side, rgba(70, 45, 25, .32), rgba(70, 45, 25, .12) 60%, transparent); }
+.scene-wrap .today-tag { font-size: 9px; padding: 0 6px; opacity: .85; }
+@media (prefers-reduced-motion: reduce) { .scene-wrap .plant img { animation: none; transform: rotate(var(--r, 0deg)); } }
