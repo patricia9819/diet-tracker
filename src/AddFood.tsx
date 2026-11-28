@@ -7,6 +7,7 @@ import { allowedFood, avoidsFive, dietPrompt } from './diet'
 import { friendlyError, readNutritionLabel, recognizeMeal, type MealResult } from './ai'
 import { decodeBarcode } from './barcode'
 import { toast } from './dialogs'
+import { Icon } from './icons'
 
 type Store = ReturnType<typeof useStore>
 type Mode = 'list' | 'pick' | 'custom' | 'photo' | 'scan'
@@ -22,7 +23,24 @@ const toForm = (f: Omit<FoodItem, 'id'>, note = ''): Form => ({
   name: f.name, unit: f.unit, kcal: String(f.kcal), protein: String(f.protein), carbs: String(f.carbs), fat: String(f.fat), save: true, barcode: f.barcode, note
 })
 
-export default function AddFood({ store, date, meal, onClose }: { store: Store; date: string; meal: Meal; onClose: () => void }) {
+/** 把照片縮成小縮圖（存在紀錄裡顯示用） */
+async function makeThumb(photo: Blob): Promise<string> {
+  try {
+    const bmp = await createImageBitmap(photo)
+    const side = 112
+    const c = document.createElement('canvas')
+    c.width = c.height = side
+    const sc = side / Math.min(bmp.width, bmp.height)
+    const w = bmp.width * sc, h = bmp.height * sc
+    c.getContext('2d')!.drawImage(bmp, (side - w) / 2, (side - h) / 2, w, h)
+    return c.toDataURL('image/jpeg', 0.7)
+  } catch {
+    return ''
+  }
+}
+
+export default function AddFood({ store, date, meal: initialMeal, onClose }: { store: Store; date: string; meal: Meal; onClose: () => void }) {
+  const [meal, setMeal] = useState<Meal>(initialMeal)
   const { data, update } = store
   const p = data.profile!
   const [mode, setMode] = useState<Mode>('list')
@@ -48,9 +66,10 @@ export default function AddFood({ store, date, meal, onClose }: { store: Store; 
 
   const results = q.trim() ? all.filter((f) => f.name.toLowerCase().includes(q.trim().toLowerCase())) : null
 
-  const addMany = (items: { f: FoodItem; s: number }[]) => {
+  const addMany = (items: { f: FoodItem; s: number }[], thumb = '') => {
     update((d) => ({
       ...d,
+      photos: thumb ? { ...d.photos, [date]: { ...(d.photos?.[date] ?? {}), [meal]: thumb } } : d.photos,
       logs: [...d.logs, ...items.filter((x) => x.s > 0).map(({ f, s }) => ({ id: uid(), date, meal, foodId: f.id, name: f.name, unit: f.unit, servings: s, kcal: f.kcal, protein: f.protein, carbs: f.carbs, fat: f.fat }))]
     }))
     onClose()
@@ -82,8 +101,13 @@ export default function AddFood({ store, date, meal, onClose }: { store: Store; 
       <div className="sheet" onClick={(e) => e.stopPropagation()}>
         <div className="sheet-head">
           <b>新增{label}</b>
-          <button className="icon" onClick={onClose} aria-label="關閉">✕</button>
+          <button className="icon-btn" onClick={onClose} aria-label="關閉"><Icon name="close" /></button>
         </div>
+        {(mode === 'list' || mode === 'photo') && (
+          <div className="meal-pick" role="group" aria-label="哪一餐">
+            {MEALS.map((m) => <button key={m.key} className={m.key === meal ? 'on' : ''} onClick={() => setMeal(m.key)}>{m.label}</button>)}
+          </div>
+        )}
 
         {mode === 'pick' && picked && (
           <div className="pick">
@@ -132,9 +156,9 @@ export default function AddFood({ store, date, meal, onClose }: { store: Store; 
         {mode === 'list' && (
           <>
             <div className="quick">
-              <button onClick={() => setMode('photo')}><span>📷</span>拍照／聚餐</button>
-              <button onClick={() => setMode('scan')}><span>🔍</span>拍條碼</button>
-              <button onClick={() => openCustom(emptyForm(q))}><span>✏️</span>自己輸入</button>
+              <button onClick={() => setMode('photo')}><Icon name="camera" size={24} />拍照／聚餐</button>
+              <button onClick={() => setMode('scan')}><Icon name="barcode" size={24} />拍條碼</button>
+              <button onClick={() => openCustom(emptyForm(q))}><Icon name="pencil" size={24} />自己輸入</button>
             </div>
             <input className="search" placeholder="搜尋食物，例如：豆干、豆漿" value={q} onChange={(e) => setQ(e.target.value)} />
             <div className="list">
@@ -189,7 +213,7 @@ const SOLO_LEVELS = [
   { label: '一份', k: 1 }
 ]
 
-function PhotoMeal({ dietInfo, onBack, onAdd }: { dietInfo: string; onBack: () => void; onAdd: (x: { f: FoodItem; s: number }[]) => void }) {
+function PhotoMeal({ dietInfo, onBack, onAdd }: { dietInfo: string; onBack: () => void; onAdd: (x: { f: FoodItem; s: number }[], thumb?: string) => void }) {
   const fileRef = useRef<HTMLInputElement>(null)
   const [preview, setPreview] = useState('')
   const [photo, setPhoto] = useState<Blob | null>(null)
@@ -227,7 +251,7 @@ function PhotoMeal({ dietInfo, onBack, onAdd }: { dietInfo: string; onBack: () =
   const setItem = (i: number, k: 'kcal' | 'name', v: string) =>
     setItems(items.map((it, j) => (j === i ? { ...it, [k]: k === 'kcal' ? num(v) : v } : it)))
 
-  const confirm = () => onAdd(items.flatMap((it, i) => share[i] > 0 ? [{
+  const confirm = async () => onAdd(items.flatMap((it, i) => share[i] > 0 ? [{
     f: {
       id: 'ai' + uid(),
       name: it.shared ? `${it.name}（聚餐 ${n} 人）` : it.name,
@@ -235,24 +259,24 @@ function PhotoMeal({ dietInfo, onBack, onAdd }: { dietInfo: string; onBack: () =
       kcal: Math.round(it.kcal), protein: it.protein, carbs: it.carbs, fat: it.fat
     },
     s: Math.round(servingsOf(i) * 1000) / 1000
-  }] : []))
+  }] : []), photo ? await makeThumb(photo) : '')
 
   return (
     <div className="pick scroll">
       <input ref={fileRef} type="file" accept="image/*" capture="environment" hidden onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) choose(f) }} />
       {!res && (
         <div className="seg" role="group" aria-label="用餐方式">
-          <button className={!group ? 'on' : ''} onClick={() => setGroup(false)}>🍱 自己吃</button>
-          <button className={group ? 'on' : ''} onClick={() => setGroup(true)}>🍲 聚餐分食</button>
+          <button className={!group ? 'on' : ''} onClick={() => setGroup(false)}><Icon name="user" size={18} />自己吃</button>
+          <button className={group ? 'on' : ''} onClick={() => setGroup(true)}><Icon name="users" size={18} />聚餐分食</button>
         </div>
       )}
       {!res && group && (
         <div className="people">
           <span>幾個人一起吃</span>
           <div className="row">
-            <button className="ghost stepper" onClick={() => setPeople(Math.max(2, people - 1))} aria-label="減少人數">−</button>
+            <button className="ghost stepper" onClick={() => setPeople(Math.max(2, people - 1))} aria-label="減少人數"><Icon name="minus" size={18} /></button>
             <b>{people} 人</b>
-            <button className="ghost stepper" onClick={() => setPeople(Math.min(30, people + 1))} aria-label="增加人數">＋</button>
+            <button className="ghost stepper" onClick={() => setPeople(Math.min(30, people + 1))} aria-label="增加人數"><Icon name="plus" size={18} /></button>
           </div>
         </div>
       )}
@@ -264,7 +288,7 @@ function PhotoMeal({ dietInfo, onBack, onAdd }: { dietInfo: string; onBack: () =
               : '拍下整份餐點，Claude 會辨識內容並估算熱量。'}
             <br />第一次使用時，請在跳出的視窗允許這個頁面使用 Claude。
           </p>
-          <button className="primary" onClick={() => fileRef.current?.click()}>📷 拍照或選照片</button>
+          <button className="primary" onClick={() => fileRef.current?.click()}><Icon name="camera" size={18} />拍照或選照片</button>
         </div>
       ) : (
         <>
@@ -306,7 +330,7 @@ function PhotoMeal({ dietInfo, onBack, onAdd }: { dietInfo: string; onBack: () =
                     <button key={l.label} className={share[i] === l.k ? 'chip on' : 'chip'} onClick={() => setShare(share.map((v, j) => (j === i ? l.k : v)))}>{l.label}</button>
                   ))}
                 </div>
-                {it.concern && <div className="warn small">⚠️ {it.concern}</div>}
+                {it.concern && <div className="warn small"><Icon name="alert" size={14} /> {it.concern}</div>}
               </div>
             </div>
           ))}
@@ -353,7 +377,7 @@ function Scanner({ customFoods, dietInfo, onBack, onFound, onForm }: {
       const r = await readNutritionLabel(file, dietInfo)
       const notes = [
         r.vegLabel && `包裝標示：${r.vegLabel}`,
-        r.concern && `⚠️ ${r.concern}`,
+        r.concern && `注意：${r.concern}`,
         r.servingsPerPackage > 1 && `本包裝共 ${r.servingsPerPackage} 份，加入後可在份數調整。`
       ].filter(Boolean).join('\n')
       onForm({ ...toForm({ ...r, custom: true }), barcode: code || r.barcode || undefined, note: notes || '請對照包裝確認 Claude 讀出的數值。' })
@@ -368,7 +392,7 @@ function Scanner({ customFoods, dietInfo, onBack, onFound, onForm }: {
         <>
           <div className="center" style={{ padding: '16px 0 8px' }}>
             <p className="muted">拍下包裝上的條碼。掃過並存起來的食物，下次拍條碼就會直接找到。</p>
-            <button className="primary" onClick={() => codeRef.current?.click()} disabled={status === 'decoding'}>{status === 'decoding' ? '讀取條碼中…' : '📷 拍條碼'}</button>
+            <button className="primary" onClick={() => codeRef.current?.click()} disabled={status === 'decoding'}>{status === 'decoding' ? '讀取條碼中…' : <><Icon name="barcode" size={18} />拍條碼</>}</button>
           </div>
           <div className="row">
             <input className="search grow" inputMode="numeric" placeholder="或輸入條碼數字" value={manual} onChange={(e) => setManual(e.target.value.replace(/\D/g, ''))} />
@@ -381,7 +405,7 @@ function Scanner({ customFoods, dietInfo, onBack, onFound, onForm }: {
         <div className="center" style={{ padding: '12px 0' }}>
           <p>條碼 {code} 還沒有存過。</p>
           <p className="muted">拍下包裝背面的「營養標示」，Claude 會幫你讀出數值。存起來後，下次拍這個條碼就會直接找到。</p>
-          <button className="primary" onClick={() => labelRef.current?.click()}>📷 拍營養標示</button>
+          <button className="primary" onClick={() => labelRef.current?.click()}><Icon name="camera" size={18} />拍營養標示</button>
         </div>
       )}
       {err && <div className="alert">{err}</div>}

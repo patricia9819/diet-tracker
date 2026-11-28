@@ -20,6 +20,10 @@ export interface Profile {
   diet?: DietType
   fiveSpices?: boolean // 是否吃五辛（蔥、蒜、韭、薤／蕎、興渠）
   exerciseAddBack?: number // 運動消耗加回額度的比例 0–1
+  nickname?: string
+  stepGoal?: number
+  waterGoal?: number
+  reminders?: { weight: boolean; meals: boolean; water: boolean }
 }
 
 export interface WeightEntry {
@@ -53,9 +57,23 @@ export interface ExerciseEntry {
   kcal: number
 }
 
+export interface StepDay {
+  steps: number
+  km?: number
+  source: 'screenshot' | 'manual'
+}
+
+export interface AdviceTip {
+  icon: string
+  text: string
+}
+
 export interface Advice {
   date: string
-  text: string
+  text: string // 完整建議（Markdown）
+  title?: string
+  summary?: string
+  tips?: AdviceTip[]
 }
 
 export interface LogEntry extends Nutrients {
@@ -77,7 +95,8 @@ export interface AppData {
   water: Record<string, number> // date -> ml
   exercises: ExerciseEntry[]
   advice: Advice[]
-  reminders?: { id: string; label: string; time: string; on: boolean }[]
+  steps: Record<string, StepDay> // date -> 步數
+  photos: Record<string, Partial<Record<Meal, string>>> // date -> 餐點縮圖（data URL）
 }
 
 export const MEALS: { key: Meal; label: string }[] = [

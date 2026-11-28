@@ -100,23 +100,59 @@ export async function readNutritionLabel(photo: Blob, dietInfo: string): Promise
   }
 }
 
-export async function getAdvice(dietInfo: string, report: string, onText: (t: string) => void) {
+export interface StepRead { date: string; steps: number; km: number }
+
+/** 讀健康 App / Garmin Connect 的步數截圖 */
+export async function readSteps(photo: Blob, today: string): Promise<{ days: StepRead[]; source: string; note: string }> {
+  const d = new Date(today + 'T12:00:00')
+  const week = '日一二三四五六'[d.getDay()]
   const prompt = [
-    '你是一位溫和、務實的台灣營養師，正在協助使用者減重。請根據下面使用者最近的飲食、體重與運動紀錄給建議。',
+    '附上的圖片是手機健康 App（例如 iPhone「健康」、Garmin Connect、Google Fit、小米運動）的步數截圖。',
+    `今天是 ${today}（星期${week}）。請讀出圖片裡每一天的步數，並換算成日期（YYYY-MM-DD）。`,
+    '「今天」「昨天」「週三」或只有月日的標示，請依今天的日期推算；年份不明時用最接近今天、且不晚於今天的日期。',
+    '如果是一週或一個月的長條圖，只列出圖上有明確數字、或能清楚讀出數值的日子，不要猜。看不出日期的數字不要列。',
+    '',
+    '只回覆一個 JSON 物件：',
+    '{"days":[{"date":"2026-11-27","steps":8532,"km":6.1}],"source":"iPhone 健康","note":"一句說明，例如讀不清楚的地方"}',
+    'km 是距離（公里），圖上沒有就填 0。如果圖片不是步數紀錄，days 為空陣列並在 note 說明。'
+  ].join('\n')
+  const r = (await (await need()).json<Record<string, unknown>>(prompt, { images: photo })) ?? {}
+  const days = (Array.isArray(r.days) ? r.days : [])
+    .map((x) => { const o = (x ?? {}) as Record<string, unknown>; return { date: s(o.date), steps: Math.round(n(o.steps)), km: n(o.km) } })
+    .filter((x) => /^\d{4}-\d{2}-\d{2}$/.test(x.date) && x.date <= today && x.steps > 0)
+  return { days, source: s(r.source), note: s(r.note) }
+}
+
+export interface AdviceResult { title: string; summary: string; tips: { icon: string; text: string }[]; detail: string }
+const TIP_ICONS = ['bowl', 'egg', 'bean', 'leaf', 'wheat', 'drop', 'walk', 'moon', 'clock', 'target']
+
+export async function getAdvice(dietInfo: string, report: string): Promise<AdviceResult> {
+  const prompt = [
+    '你是一位溫和、務實的台灣營養師，正在協助使用者減重。請根據下面使用者最近的飲食、體重與活動紀錄給建議。',
     '',
     '使用者的飲食習慣：',
     dietInfo,
     '',
-    '回覆規則：',
+    '規則：',
     '- 使用繁體中文，口吻友善，不說教。',
-    '- 先用一兩句肯定做得好的地方，再給 3 到 5 個具體、可以馬上做到的調整建議，盡量舉出台灣容易買到、符合使用者飲食習慣的食物。',
+    '- 建議要具體、可以馬上做到，盡量舉出台灣容易買到、符合使用者飲食習慣的食物（不要建議肉類、海鮮，或使用者不吃的五辛）。',
     '- 使用者是素食者時，留意蛋白質、維生素 B12、鐵、鈣、鋅與 omega-3 是否可能不足，但只在紀錄顯示有需要時提出。',
     '- 不要建議低於安全下限的熱量，也不要做醫療診斷；若數據異常（例如每週減超過 1 公斤），建議諮詢醫師或營養師。',
-    '- 格式：用「## 」做小標題、「- 」做條列，全文約 300 到 500 字，不要用表格。',
+    '',
+    '只回覆一個 JSON 物件：',
+    '{"title":"今天最重要的一個重點，12 字以內，可用逗號分兩行，例如「補足蛋白質，讓能量更穩定」",',
+    ' "summary":"60 到 100 字，說明為什麼與怎麼做",',
+    ' "tips":[{"icon":"egg","text":"20 字以內的具體行動"}],',
+    ' "detail":"完整建議，用「## 」做小標題、「- 」做條列，約 250 到 400 字，先肯定做得好的地方"}',
+    `tips 給 3 到 4 個；icon 只能是 ${TIP_ICONS.join('、')} 其中之一（bowl 一般飲食、egg 蛋白質、bean 豆製品、leaf 蔬菜、wheat 全穀、drop 喝水、walk 走路活動、moon 睡眠、clock 用餐時間、target 目標）。`,
     '',
     '---',
     report
   ].join('\n')
-  const r = await (await need())(prompt, { onText: ({ text }: { text: string }) => onText(text), cache: false })
-  return r.text.trim()
+  const o = (await (await need()).json<Record<string, unknown>>(prompt, { cache: false })) ?? {}
+  const tips = (Array.isArray(o.tips) ? o.tips : []).slice(0, 4).map((x) => {
+    const t = (x ?? {}) as Record<string, unknown>
+    return { icon: TIP_ICONS.includes(s(t.icon)) ? s(t.icon) : 'leaf', text: s(t.text) }
+  }).filter((t) => t.text)
+  return { title: s(o.title) || '今天的飲食建議', summary: s(o.summary), tips, detail: s(o.detail) }
 }

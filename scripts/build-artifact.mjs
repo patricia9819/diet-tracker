@@ -9,6 +9,9 @@ const safeJs = js.replace(/<\/script/gi, '<\\/script').replace(/<!--/g, '<\\!--'
 
 const html = `<title>減重紀錄</title>
 <meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@500;600&display=swap">
 <style>${css}</style>
 <div id="root"></div>
 <script type="module">${safeJs}</script>

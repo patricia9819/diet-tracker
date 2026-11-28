@@ -10,7 +10,7 @@ import { useCap } from './platform'
  */
 const LOCAL_KEY = 'diet-tracker-v1'
 
-export const empty = (): AppData => ({ version: 1, profile: null, weights: [], logs: [], customFoods: [], water: {}, exercises: [], advice: [] })
+export const empty = (): AppData => ({ version: 1, profile: null, weights: [], logs: [], customFoods: [], water: {}, exercises: [], advice: [], steps: {}, photos: {} })
 
 type Docs = Record<string, Record<string, unknown>>
 
@@ -18,12 +18,15 @@ function split(d: AppData): Docs {
   const docs: Docs = { main: { profile: d.profile, customFoods: d.customFoods, advice: d.advice } }
   const m = (date: string) => {
     const k = 'm-' + date.slice(0, 7)
-    return (docs[k] ??= { logs: [], weights: [], water: {}, exercises: [] }) as { logs: unknown[]; weights: unknown[]; water: Record<string, number>; exercises: unknown[] }
+    return (docs[k] ??= { logs: [], weights: [], water: {}, exercises: [], steps: {} }) as { logs: unknown[]; weights: unknown[]; water: Record<string, number>; exercises: unknown[]; steps: Record<string, unknown> }
   }
   for (const l of d.logs) m(l.date).logs.push(l)
   for (const w of d.weights) m(w.date).weights.push(w)
   for (const e of d.exercises) m(e.date).exercises.push(e)
   for (const [date, ml] of Object.entries(d.water)) m(date).water[date] = ml
+  for (const [date, st] of Object.entries(d.steps ?? {})) m(date).steps[date] = st
+  // 餐點縮圖一天一份文件，避免每月文件太大
+  for (const [date, ph] of Object.entries(d.photos ?? {})) if (ph && Object.keys(ph).length) docs['p-' + date] = { ...ph }
   return docs
 }
 
@@ -36,12 +39,14 @@ function join(docs: Docs): AppData {
     d.advice = main.advice ?? []
   }
   for (const [k, v] of Object.entries(docs)) {
+    if (k.startsWith('p-')) { d.photos[k.slice(2)] = v as AppData['photos'][string]; continue }
     if (!k.startsWith('m-')) continue
     const m = v as Partial<AppData>
     d.logs.push(...(m.logs ?? []))
     d.weights.push(...(m.weights ?? []))
     d.exercises.push(...(m.exercises ?? []))
     Object.assign(d.water, m.water ?? {})
+    Object.assign(d.steps, m.steps ?? {})
   }
   return d
 }
