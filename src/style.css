@@ -145,3 +145,20 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px s
 .logo { font-size: 44px; }
 .stats b, .summary-side b, .ring-num, .bar-head { font-variant-numeric: tabular-nums; }
 @media (prefers-reduced-motion: reduce) { .ring-fg, .bar-fill { transition: none; } }
+
+/* 聚餐模式 */
+.seg { display: grid; grid-template-columns: 1fr 1fr; background: var(--bg); border-radius: 12px; padding: 4px; gap: 4px; margin-bottom: 10px; }
+.seg button { padding: 9px 4px; border-radius: 9px; font-weight: 600; color: var(--muted); }
+.seg button.on { background: var(--card); color: var(--accent); box-shadow: 0 1px 2px var(--shadow); }
+.people { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+.people b { min-width: 52px; text-align: center; font-variant-numeric: tabular-nums; }
+.stepper { width: 40px; padding: 6px 0; font-size: 18px; }
+.levels { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+.levels .chip { padding: 5px 12px; }
+.ai-item.off .inline, .ai-item.off .mine { opacity: .45; }
+.mine { font-weight: 700; font-size: 17px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.mine small { font-weight: 400; font-size: 12px; color: var(--muted); }
+.nowrap { flex-wrap: nowrap; }
+.inline-kcal { display: inline-flex; align-items: baseline; gap: 2px; }
+.tag { font-style: normal; font-size: 11px; color: var(--accent); background: var(--accent-soft); border-radius: 6px; padding: 1px 6px; margin-left: 6px; }
+.inline-kcal .inline.kcal { width: 52px; text-align: center; padding: 0 2px; font-size: 15px; }

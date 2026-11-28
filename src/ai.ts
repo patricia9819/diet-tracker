@@ -37,31 +37,46 @@ export async function canUseImages() {
   return !!l?.images
 }
 
-export interface MealItem { name: string; portion: string; kcal: number; protein: number; carbs: number; fat: number; concern: string }
+export interface MealItem { name: string; portion: string; kcal: number; protein: number; carbs: number; fat: number; concern: string; shared: boolean }
 export interface MealResult { items: MealItem[]; comment: string }
 export interface LabelResult { name: string; unit: string; kcal: number; protein: number; carbs: number; fat: number; servingsPerPackage: number; vegLabel: string; concern: string; barcode: string }
 
 const n = (v: unknown) => { const x = Number(v); return isFinite(x) && x >= 0 ? Math.round(x * 10) / 10 : 0 }
 const s = (v: unknown) => (typeof v === 'string' ? v : '')
 
-export async function recognizeMeal(photo: Blob, dietInfo: string, hint: string): Promise<MealResult> {
+/** people > 1 為聚餐模式：回傳每道菜「整道」的數值，並標示是否為大家分食的合菜 */
+export async function recognizeMeal(photo: Blob, dietInfo: string, hint: string, people = 1): Promise<MealResult> {
+  const group = people > 1
   const prompt = [
-    '你是台灣的營養師助理。附上的照片是使用者的一餐，請辨識照片裡每一樣食物，估算份量與營養素。',
-    '以台灣常見的食物與份量為準。同一道菜不要拆得太細，例如一個便當可拆成主食、主菜、配菜。',
+    group
+      ? `你是台灣的營養師助理。附上的照片是 ${people} 個人聚餐的整桌菜，請辨識每一道菜。`
+      : '你是台灣的營養師助理。附上的照片是使用者的一餐，請辨識照片裡每一樣食物，估算份量與營養素。',
+    group
+      ? [
+          '每道菜請估算「整道菜」（整盤、整鍋）的份量與營養素，不要先除以人數，使用者會自己選吃了多少。',
+          'shared：大家一起分食的合菜填 true；每人各一份的個人餐點（例如每人一碗白飯、個人飲料、個人套餐）填 false，這類請給「一人份」的數值。',
+          '餐廳合菜通常用油較多，請依台灣餐廳的常見做法估算，不要低估油脂。'
+        ].join('\n')
+      : '以台灣常見的食物與份量為準。同一道菜不要拆得太細，例如一個便當可拆成主食、主菜、配菜。shared 一律填 false。',
     '',
     '使用者的飲食習慣：',
     dietInfo,
     hint ? `\n使用者補充：${hint}` : '',
     '',
     '只回覆一個 JSON 物件，格式如下（數值為數字，熱量單位大卡，其他單位公克）：',
-    '{"items":[{"name":"五穀飯","portion":"1 碗約 180g","kcal":250,"protein":6,"carbs":52,"fat":2,"concern":""}],"comment":"一兩句整體說明"}',
-    'concern：若這樣食物可能不符合使用者的飲食習慣（含葷、含五辛、含不吃的蛋或奶），用一句話說明原因；沒有問題就填空字串。',
+    group
+      ? '{"items":[{"name":"麻婆豆腐","portion":"1 盤約 500g","kcal":620,"protein":30,"carbs":20,"fat":46,"shared":true,"concern":""}],"comment":"一兩句整體說明"}'
+      : '{"items":[{"name":"五穀飯","portion":"1 碗約 180g","kcal":250,"protein":6,"carbs":52,"fat":2,"shared":false,"concern":""}],"comment":"一兩句整體說明"}',
+    'concern：若這道菜可能不符合使用者的飲食習慣（含葷、含五辛、含不吃的蛋或奶、可能用葷高湯），用一句話說明原因；沒有問題就填空字串。',
     '如果照片裡沒有食物，items 為空陣列並在 comment 說明。'
   ].join('\n')
   const r = await (await need()).json<{ items?: unknown[]; comment?: unknown }>(prompt, { images: photo })
   const items = (Array.isArray(r?.items) ? r.items : []).map((x) => {
     const o = (x ?? {}) as Record<string, unknown>
-    return { name: s(o.name) || '食物', portion: s(o.portion) || '1 份', kcal: n(o.kcal), protein: n(o.protein), carbs: n(o.carbs), fat: n(o.fat), concern: s(o.concern) }
+    return {
+      name: s(o.name) || '食物', portion: s(o.portion) || '1 份', kcal: n(o.kcal), protein: n(o.protein), carbs: n(o.carbs), fat: n(o.fat),
+      concern: s(o.concern), shared: group && o.shared !== false
+    }
   })
   return { items, comment: s(r?.comment) }
 }

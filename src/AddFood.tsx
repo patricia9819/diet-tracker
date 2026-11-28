@@ -132,7 +132,7 @@ export default function AddFood({ store, date, meal, onClose }: { store: Store; 
         {mode === 'list' && (
           <>
             <div className="quick">
-              <button onClick={() => setMode('photo')}><span>📷</span>拍照辨識</button>
+              <button onClick={() => setMode('photo')}><span>📷</span>拍照／聚餐</button>
               <button onClick={() => setMode('scan')}><span>🔍</span>拍條碼</button>
               <button onClick={() => openCustom(emptyForm(q))}><span>✏️</span>自己輸入</button>
             </div>
@@ -176,16 +176,32 @@ function CustomForm({ form, setForm, onBack, onAdd }: { form: Form; setForm: (f:
   )
 }
 
+// 聚餐時每道合菜可以選吃了多少（以「平均一人份」為基準）
+const SHARE_LEVELS = [
+  { label: '沒吃', k: 0 },
+  { label: '一點', k: 0.5 },
+  { label: '平均', k: 1 },
+  { label: '比較多', k: 1.5 }
+]
+const SOLO_LEVELS = [
+  { label: '沒吃', k: 0 },
+  { label: '半份', k: 0.5 },
+  { label: '一份', k: 1 }
+]
+
 function PhotoMeal({ dietInfo, onBack, onAdd }: { dietInfo: string; onBack: () => void; onAdd: (x: { f: FoodItem; s: number }[]) => void }) {
   const fileRef = useRef<HTMLInputElement>(null)
   const [preview, setPreview] = useState('')
   const [photo, setPhoto] = useState<Blob | null>(null)
   const [hint, setHint] = useState('')
+  const [group, setGroup] = useState(false)
+  const [people, setPeople] = useState(4)
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
   const [res, setRes] = useState<MealResult | null>(null)
-  const [sel, setSel] = useState<boolean[]>([])
   const [items, setItems] = useState<MealResult['items']>([])
+  const [share, setShare] = useState<number[]>([]) // 每道菜吃的比例（相對於平均一人份或一份）
+  const n = group ? people : 1
 
   useEffect(() => () => { if (preview) URL.revokeObjectURL(preview) }, [preview])
   const choose = (file: File) => {
@@ -197,26 +213,57 @@ function PhotoMeal({ dietInfo, onBack, onAdd }: { dietInfo: string; onBack: () =
   const run = async () => {
     setBusy(true); setErr('')
     try {
-      const r = await recognizeMeal(photo!, dietInfo, hint)
-      setRes(r); setItems(r.items); setSel(r.items.map(() => true))
+      const r = await recognizeMeal(photo!, dietInfo, hint, n)
+      setRes(r); setItems(r.items); setShare(r.items.map(() => 1))
     } catch (e) { setErr(friendlyError(e)) }
     setBusy(false)
   }
 
+  // 實際吃下的份數（相對於這道菜的數值）
+  const servingsOf = (i: number) => (items[i].shared ? share[i] / n : share[i])
+  const mine = (i: number, k: 'kcal' | 'protein' | 'carbs' | 'fat') => items[i][k] * servingsOf(i)
+  const total = items.reduce((a, _, i) => a + mine(i, 'kcal'), 0)
+
   const setItem = (i: number, k: 'kcal' | 'name', v: string) =>
     setItems(items.map((it, j) => (j === i ? { ...it, [k]: k === 'kcal' ? num(v) : v } : it)))
 
-  const confirm = () => onAdd(items.flatMap((it, i) => sel[i] ? [{
-    f: { id: 'ai' + uid(), name: it.name, unit: it.portion, kcal: Math.round(it.kcal), protein: it.protein, carbs: it.carbs, fat: it.fat },
-    s: 1
+  const confirm = () => onAdd(items.flatMap((it, i) => share[i] > 0 ? [{
+    f: {
+      id: 'ai' + uid(),
+      name: it.shared ? `${it.name}（聚餐 ${n} 人）` : it.name,
+      unit: it.shared ? `整道 ${it.portion}` : it.portion,
+      kcal: Math.round(it.kcal), protein: it.protein, carbs: it.carbs, fat: it.fat
+    },
+    s: Math.round(servingsOf(i) * 1000) / 1000
   }] : []))
 
   return (
     <div className="pick scroll">
-      <input ref={fileRef} type="file" accept="image/*" capture="environment" hidden onChange={(e) => e.target.files?.[0] && choose(e.target.files[0])} />
+      <input ref={fileRef} type="file" accept="image/*" capture="environment" hidden onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) choose(f) }} />
+      {!res && (
+        <div className="seg" role="group" aria-label="用餐方式">
+          <button className={!group ? 'on' : ''} onClick={() => setGroup(false)}>🍱 自己吃</button>
+          <button className={group ? 'on' : ''} onClick={() => setGroup(true)}>🍲 聚餐分食</button>
+        </div>
+      )}
+      {!res && group && (
+        <div className="people">
+          <span>幾個人一起吃</span>
+          <div className="row">
+            <button className="ghost stepper" onClick={() => setPeople(Math.max(2, people - 1))} aria-label="減少人數">−</button>
+            <b>{people} 人</b>
+            <button className="ghost stepper" onClick={() => setPeople(Math.min(30, people + 1))} aria-label="增加人數">＋</button>
+          </div>
+        </div>
+      )}
       {!preview ? (
-        <div className="center" style={{ padding: '24px 0' }}>
-          <p className="muted">拍下整份餐點，Claude 會辨識內容並估算熱量。<br />第一次使用時，請在跳出的視窗允許這個頁面使用 Claude。</p>
+        <div className="center" style={{ padding: '20px 0' }}>
+          <p className="muted">
+            {group
+              ? '開動前把整桌菜拍下來。Claude 會估算每道菜，再由你選每道吃了多少。'
+              : '拍下整份餐點，Claude 會辨識內容並估算熱量。'}
+            <br />第一次使用時，請在跳出的視窗允許這個頁面使用 Claude。
+          </p>
           <button className="primary" onClick={() => fileRef.current?.click()}>📷 拍照或選照片</button>
         </div>
       ) : (
@@ -224,7 +271,9 @@ function PhotoMeal({ dietInfo, onBack, onAdd }: { dietInfo: string; onBack: () =
           <img src={preview} className="photo" alt="餐點照片" />
           {!res && (
             <>
-              <label className="field">補充說明（選填）<input value={hint} onChange={(e) => setHint(e.target.value)} placeholder="例如：飯只吃一半、素食自助餐" /></label>
+              <label className="field">補充說明（選填）
+                <input value={hint} onChange={(e) => setHint(e.target.value)} placeholder={group ? '例如：素食餐廳、那鍋湯是昆布湯底' : '例如：飯只吃一半、素食自助餐'} />
+              </label>
               <div className="row end">
                 <button className="ghost" onClick={() => fileRef.current?.click()}>換一張</button>
                 <button className="primary" onClick={run} disabled={busy}>{busy ? 'Claude 辨識中，約 10–40 秒…' : '開始辨識'}</button>
@@ -236,25 +285,36 @@ function PhotoMeal({ dietInfo, onBack, onAdd }: { dietInfo: string; onBack: () =
       {err && <div className="alert">{err}</div>}
       {res && (
         <>
+          {group && items.length > 0 && <p className="note" style={{ marginTop: 4 }}>{n} 人分食。「平均」是整道菜的 1/{n}；個人份的菜（例如自己那碗飯）用「一份」計算。</p>}
           {items.length === 0 && <p className="muted">{res.comment || '沒有辨識到食物'}</p>}
           {items.map((it, i) => (
-            <div className="ai-item" key={i}>
-              <input type="checkbox" checked={sel[i]} onChange={(e) => setSel(sel.map((v, j) => (j === i ? e.target.checked : v)))} />
+            <div className={share[i] > 0 ? 'ai-item' : 'ai-item off'} key={i}>
               <div className="grow">
-                <input className="inline" value={it.name} onChange={(e) => setItem(i, 'name', e.target.value)} />
-                <small className="muted">{it.portion}・蛋白 {Math.round(it.protein)}g・碳水 {Math.round(it.carbs)}g・脂肪 {Math.round(it.fat)}g</small>
+                <div className="row between nowrap">
+                  <input className="inline grow" value={it.name} onChange={(e) => setItem(i, 'name', e.target.value)} aria-label="菜名" />
+                  <span className="mine">{Math.round(mine(i, 'kcal'))}<small> 大卡</small></span>
+                </div>
+                <small className="muted">
+                  {it.shared ? '整道' : ''}{it.portion}・
+                  <label className="inline-kcal">
+                    <input className="inline kcal" inputMode="decimal" value={Math.round(it.kcal)} onChange={(e) => setItem(i, 'kcal', e.target.value)} aria-label={it.shared ? '整道熱量' : '熱量'} /> 大卡
+                  </label>
+                  {it.shared && <em className="tag">合菜</em>}
+                </small>
+                <div className="levels">
+                  {(it.shared ? SHARE_LEVELS : SOLO_LEVELS).map((l) => (
+                    <button key={l.label} className={share[i] === l.k ? 'chip on' : 'chip'} onClick={() => setShare(share.map((v, j) => (j === i ? l.k : v)))}>{l.label}</button>
+                  ))}
+                </div>
                 {it.concern && <div className="warn small">⚠️ {it.concern}</div>}
               </div>
-              <input className="inline kcal" inputMode="decimal" value={Math.round(it.kcal)} onChange={(e) => setItem(i, 'kcal', e.target.value)} />
             </div>
           ))}
           {res.comment && items.length > 0 && <p className="note">{res.comment}</p>}
-          <p className="note">AI 估算可能有誤差，可以先修改名稱和熱量再加入。</p>
+          <p className="note">Claude 估算的是大約數值，熱量可以直接修改。</p>
           <div className="row end">
             <button className="ghost" onClick={onBack}>取消</button>
-            <button className="primary" onClick={confirm} disabled={!sel.some(Boolean)}>
-              加入 {Math.round(items.reduce((a, it, i) => a + (sel[i] ? it.kcal : 0), 0))} 大卡
-            </button>
+            <button className="primary" onClick={confirm} disabled={!share.some((v) => v > 0)}>加入 {Math.round(total)} 大卡</button>
           </div>
         </>
       )}

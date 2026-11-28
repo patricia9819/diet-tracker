@@ -119,7 +119,7 @@ export default function Today({ store, currentKg }: { store: Store; currentKg: n
               <div className="log" key={l.id}>
                 <div>
                   <div>{l.name}</div>
-                  <small className="muted">{l.servings !== 1 ? `${r1(l.servings)} × ` : ''}{l.unit}</small>
+                  <small className="muted">{l.servings === 1 ? '' : l.servings < 1 ? `吃了約 ${Math.round(l.servings * 100)}%・` : `${r1(l.servings)} × `}{l.unit}</small>
                 </div>
                 <div className="row">
                   <span>{Math.round(l.kcal * l.servings)}</span>
