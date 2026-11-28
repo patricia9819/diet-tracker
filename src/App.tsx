@@ -78,7 +78,7 @@ export default function App() {
                 請到「我的 → 個人資料與目標」設定飲食習慣（例如奶蛋素），食物清單和 Claude 的建議都會依此調整。
               </div>
             )}
-            <Today store={store} currentKg={currentKg} goBody={() => go('body')} />
+            <Today store={store} currentKg={currentKg} goBody={() => go('body')} goGarden={() => go('garden')} />
           </>
         )}
         {tab === 'body' && <WeightView store={store} />}

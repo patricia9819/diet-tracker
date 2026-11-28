@@ -11,6 +11,7 @@
   --sky-1: #a9c3d6; --sky-2: #dce8ef; --cloud: #f6f8fa;
   --pot: #c8a690; --pot-rim: #b8937c; --soil: #7d6656; --stem: #6b8a63; --leaf: #8fae84; --leaf-2: #6f9266;
   --bud: #b9cf9f; --petal: #efc2bb; --core: #e9b65a; --water: #7fa6bd; --water-soft: #dfeaf0;
+  --gs-hedge: #93ad86; --gs-lawn-1: #c9d8b2; --gs-lawn-2: #b4c89d; --gs-lawn-line: #ddead0; --gs-path: #eadcc4; --gs-stone: #faf3e6; --gs-soil-1: #d9c3a0; --gs-soil-2: #c4a982; --gs-bush-1: #87a37a; --gs-bush-2: #a3bb92;
   --gp-bg: #f3eadc; --gp-card: #fbf6ee; --gp-tile: #f1e6d5; --gp-edge: #e4d5bd; --gp-ink: #4b4038; --gp-muted: #9a8a79;
   --gp-rose: #e2a7a2; --gp-rose-d: #c07a75; --gp-sage: #8ea583; --gp-sage-d: #67825e; --gp-gold: #d6ae62; --gp-soil: #d9c6a8; --gp-shadow: rgba(130, 100, 60, .17);
   --serif: "Noto Serif TC", "Songti TC", "Source Han Serif TC", Georgia, serif;
@@ -569,3 +570,60 @@ body:has(.garden-app) { background: var(--gp-bg); }
   .sparkles, .fx-leaves { display: none; }
 }
 .g-card > .stamp { top: -18px; right: 8px; width: 64px; height: 64px; font-size: 13px; }
+
+/* ===== 活花園場景 ===== */
+.scene { position: relative; overflow: hidden; margin: 0 calc(-1 * max(20px, env(safe-area-inset-right, 0px))) 0 calc(-1 * max(20px, env(safe-area-inset-left, 0px))); border-radius: 0 0 26px 26px; box-shadow: 0 12px 24px var(--gp-shadow); background: #b9c9a6; isolation: isolate; user-select: none; -webkit-user-select: none; }
+.scene > img { position: absolute; display: block; max-width: none; pointer-events: none; }
+.scene-bg { left: 0; top: 0; object-fit: cover; }
+.scene-tree { transform-origin: 0% 100%; animation: treeSway 7s ease-in-out infinite; }
+.scene-wisteria { transform-origin: 50% 0%; animation: wisteriaSway 4.8s ease-in-out infinite; }
+@keyframes treeSway { 0%, 100% { transform: rotate(-.5deg) skewX(.4deg); } 50% { transform: rotate(.55deg) skewX(-.5deg); } }
+@keyframes wisteriaSway { 0%, 100% { transform: rotate(1.4deg); } 50% { transform: rotate(-1.6deg); } }
+.ground { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.sun, .moon { position: absolute; transform: translate(-50%, -50%); border-radius: 50%; pointer-events: none; z-index: 2; transition: left 60s linear, top 60s linear, opacity 3s; }
+.sun { width: 11%; aspect-ratio: 1; background: radial-gradient(circle, #fffaf0 0 30%, #ffe2a0 45%, rgba(255, 214, 140, .35) 62%, rgba(255, 214, 140, 0) 72%); mix-blend-mode: screen; animation: sunPulse 6s ease-in-out infinite; }
+@keyframes sunPulse { 50% { transform: translate(-50%, -50%) scale(1.06); } }
+.moon { width: 8.5%; aspect-ratio: 1; background: transparent; box-shadow: 0.5em 0.14em 0 0 #f6eed3; font-size: 18px; filter: drop-shadow(0 0 8px rgba(255, 244, 200, .8)); }
+.plant { position: absolute; transform: translate(-50%, -100%); padding: 0; background: none; border: 0; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.plant img { width: 100%; height: 100%; display: block; transform-origin: 50% 100%; filter: drop-shadow(0 3px 3px rgba(90, 60, 30, .22)); animation: plantSway 4.2s ease-in-out infinite alternate; animation-delay: inherit; pointer-events: none; }
+.plant.poked img { animation: plantPoke .75s cubic-bezier(.3, 1.6, .5, 1), plantSway 4.2s ease-in-out .75s infinite alternate; }
+@keyframes plantSway { from { transform: rotate(-2deg); } to { transform: rotate(2.2deg); } }
+@keyframes plantPoke { 0% { transform: rotate(0) scale(1); } 20% { transform: rotate(-9deg) scale(1.08, .94); } 45% { transform: rotate(7deg) scale(.96, 1.06); } 70% { transform: rotate(-4deg); } 100% { transform: rotate(0) scale(1); } }
+.plant:focus-visible { outline: 2px solid var(--gp-rose-d); outline-offset: 2px; border-radius: 8px; }
+.bubble { position: absolute; left: 50%; bottom: 100%; transform: translate(-50%, -4px); white-space: nowrap; font-size: 11px; font-family: var(--serif); color: var(--gp-ink); background: var(--gp-card); padding: 4px 9px; border-radius: 999px; box-shadow: 0 3px 8px rgba(0, 0, 0, .15); animation: bubble 2.4s ease forwards; pointer-events: none; z-index: 2000; }
+@keyframes bubble { 0% { opacity: 0; transform: translate(-50%, 6px); } 12%, 75% { opacity: 1; transform: translate(-50%, -4px); } 100% { opacity: 0; transform: translate(-50%, -10px); } }
+.today-tag { position: absolute; left: 50%; top: 100%; transform: translate(-50%, 2px); font-size: 10px; letter-spacing: .1em; background: var(--gp-sage); color: #fff; padding: 1px 7px; border-radius: 999px; pointer-events: none; }
+.tint { position: absolute; inset: 0; mix-blend-mode: multiply; pointer-events: none; z-index: 3000; transition: opacity 3s, background 3s; }
+.lamps { position: absolute; inset: 0; pointer-events: none; z-index: 3001; transition: opacity 3s; mix-blend-mode: screen; }
+.lamps i { position: absolute; width: 22%; aspect-ratio: 1; transform: translate(-50%, -50%); border-radius: 50%; background: radial-gradient(circle, rgba(255, 220, 150, .95) 0 6%, rgba(255, 196, 120, .45) 22%, rgba(255, 180, 100, 0) 62%); animation: lampFlicker 4s ease-in-out infinite; }
+.lamps b { position: absolute; border-radius: 40%; background: radial-gradient(ellipse at 50% 55%, rgba(255, 205, 140, .55), rgba(255, 190, 120, 0) 70%); }
+@keyframes lampFlicker { 50% { opacity: .85; } 52% { opacity: 1; } }
+.stars { position: absolute; inset: 0; pointer-events: none; z-index: 3002; }
+.stars i { position: absolute; width: 3px; height: 3px; border-radius: 50%; background: #fffbe8; box-shadow: 0 0 6px #fff6cc; animation: twinkle 2.6s ease-in-out infinite; }
+.stars em { position: absolute; width: 5px; height: 5px; border-radius: 50%; background: #f4ffb0; box-shadow: 0 0 10px 3px rgba(230, 255, 150, .7); animation: firefly 7s ease-in-out infinite; }
+@keyframes twinkle { 50% { opacity: .25; } }
+@keyframes firefly { 0%, 100% { transform: translate(0, 0); opacity: .2; } 30% { opacity: 1; } 50% { transform: translate(18px, -22px); opacity: .9; } 75% { transform: translate(-10px, -8px); opacity: .3; } }
+.breeze { position: absolute; inset: 0; pointer-events: none; z-index: 2500; overflow: hidden; }
+.breeze i { position: absolute; left: -6%; width: 12px; height: 7px; border-radius: 0 100% 0 100%; background: var(--gp-sage); opacity: 0; animation: drift 11s linear infinite; }
+.breeze i:nth-child(even) { background: var(--gp-rose); border-radius: 50% 50% 50% 50% / 60% 60% 40% 40%; width: 8px; }
+@keyframes drift { 0% { transform: translate(0, 0) rotate(0); opacity: 0; } 8% { opacity: .75; } 50% { transform: translate(55vw, -30px) rotate(200deg); } 92% { opacity: .6; } 100% { transform: translate(112vw, 10px) rotate(380deg); opacity: 0; } }
+.scene-time { position: absolute; left: max(14px, env(safe-area-inset-left, 0px)); top: 12px; z-index: 3100; font-size: 12px; font-family: var(--serif); color: var(--gp-ink); background: color-mix(in srgb, var(--gp-card) 88%, transparent); padding: 4px 10px; border-radius: 999px; box-shadow: 0 2px 6px rgba(0, 0, 0, .12); }
+.scene-empty { position: absolute; left: 50%; top: 70%; transform: translate(-50%, -50%); z-index: 3100; text-align: center; font-size: 13px; line-height: 1.7; color: var(--gp-ink); background: color-mix(in srgb, var(--gp-card) 86%, transparent); padding: 10px 16px; border-radius: 16px; box-shadow: 0 4px 12px rgba(0, 0, 0, .12); width: max-content; max-width: 80%; }
+.scene-stats { display: flex; justify-content: center; flex-wrap: wrap; gap: 6px 14px; margin: 12px 0 2px; font-size: 12.5px; color: var(--gp-muted); }
+.scene-stats b { font-family: var(--serif); font-size: 16px; color: var(--gp-ink); font-weight: 600; margin: 0 2px; }
+.garden .plaque { margin-bottom: 14px; }
+.plant-card.linkish { cursor: pointer; }
+.plant-card.linkish:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.go-garden { margin-left: auto; display: inline-flex; align-items: center; gap: 1px; font-family: var(--sans); font-size: 12px; font-weight: 400; color: var(--muted); letter-spacing: 0; }
+.plant-title { display: flex; align-items: center; gap: 4px; }
+@media (prefers-reduced-motion: reduce) {
+  .scene-tree, .scene-wisteria, .plant img, .sun, .lamps i, .stars i, .stars em { animation: none; }
+  .breeze { display: none; }
+}
+
+.today-tag { white-space: nowrap; }
+.lamps i.low { width: 34%; opacity: .45; background: radial-gradient(circle, rgba(255, 214, 150, .5), rgba(255, 200, 130, 0) 65%); }
+
+/* 只有花的中間可以點，重疊時後排的花也點得到 */
+.plant { pointer-events: none; }
+.plant .hit { position: absolute; left: 24%; right: 24%; top: 18%; bottom: 4%; pointer-events: auto; border-radius: 40%; }

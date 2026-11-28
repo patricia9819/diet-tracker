@@ -19,7 +19,7 @@ const defaultMeal = (): Meal => {
   return h < 10 ? 'breakfast' : h < 15 ? 'lunch' : h < 21 ? 'dinner' : 'snack'
 }
 
-export default function Today({ store, currentKg, goBody }: { store: Store; currentKg: number; goBody: () => void }) {
+export default function Today({ store, currentKg, goBody, goGarden }: { store: Store; currentKg: number; goBody: () => void; goGarden: () => void }) {
   const { data, update } = store
   const p = data.profile!
   const [date, setDate] = useState(todayISO())
@@ -98,7 +98,7 @@ export default function Today({ store, currentKg, goBody }: { store: Store; curr
         ))}
       </section>
 
-      <WaterPlant store={store} date={date} />
+      <WaterPlant store={store} date={date} onOpen={goGarden} />
 
       <button className="weight-row" onClick={goBody}>
         <Icon name="scale" size={22} />

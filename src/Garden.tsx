@@ -7,6 +7,7 @@ import { streak } from './habits'
 import { getSample } from './ai'
 import { Icon } from './icons'
 import { Sheet, fmt } from './ui'
+import GardenScene from './GardenScene'
 
 type Store = ReturnType<typeof useStore>
 
@@ -30,9 +31,11 @@ export default function Garden({ store }: { store: Store }) {
         <small>My Garden</small>
       </header>
 
-      <div className="g-hero">
-        <img src="garden/hero.webp" alt="紙雕風格的花園與溫室" />
-        <span className="g-chip">{+today.slice(5, 7)} 月已開 {bloomsThisMonth} 朵花・圖鑑 {got.size}/{FLOWERS.length}</span>
+      <GardenScene store={store} />
+      <div className="scene-stats">
+        <span>{+today.slice(5, 7)} 月已開 <b>{bloomsThisMonth}</b> 朵</span>
+        <span>花園裡共 <b>{Object.keys(data.water).filter((d) => d < today && stageOf(data.water[d], goal) === 4).length}</b> 朵</span>
+        <span>圖鑑 <b>{got.size}</b>/{FLOWERS.length}</span>
       </div>
 
       <section className="g-card layered">

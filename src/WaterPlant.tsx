@@ -36,7 +36,7 @@ export function FlowerSprite({ f, stage, scale = 1, className = '' }: { f: Flowe
   return <img className={'sprite ' + className} src={flowerSrc(f.id, stage)} width={Math.round(w * k)} height={Math.round(h * k)} alt={`${f.name}・${STAGES[stage]}`} draggable={false} />
 }
 
-export default function WaterPlant({ store, date, variant = 'food' }: { store: Store; date: string; variant?: 'food' | 'garden' }) {
+export default function WaterPlant({ store, date, variant = 'food', onOpen }: { store: Store; date: string; variant?: 'food' | 'garden'; onOpen?: () => void }) {
   const { data, update } = store
   const p = data.profile!
   const goal = p.waterGoal ?? 2000
@@ -115,7 +115,11 @@ export default function WaterPlant({ store, date, variant = 'food' }: { store: S
   const scale = big ? 1.15 : 0.82
 
   return (
-    <section className={`plant-card v-${variant}` + (thirsty ? ' thirsty' : '') + (stage === 4 ? ' bloomed' : '')}>
+    <section
+      className={`plant-card v-${variant}` + (thirsty ? ' thirsty' : '') + (stage === 4 ? ' bloomed' : '') + (onOpen ? ' linkish' : '')}
+      onClick={onOpen ? (e) => { if (!(e.target as HTMLElement).closest('button, input, .sheet-bg')) onOpen() } : undefined}
+      onKeyDown={onOpen ? (e) => { if ((e.key === 'Enter' || e.key === ' ') && e.target === e.currentTarget) { e.preventDefault(); onOpen() } } : undefined}
+      role={onOpen ? 'link' : undefined} tabIndex={onOpen ? 0 : undefined} aria-label={onOpen ? '今日花朵，點一下前往花園' : undefined}>
       <div className="plant-top">
         <div className="plant-stage" aria-hidden="true">
           <span className="mound" />
@@ -144,6 +148,7 @@ export default function WaterPlant({ store, date, variant = 'food' }: { store: S
         <div className="plant-info">
           <div className="plant-title">
             {f && stage >= 0 ? <>{big ? '' : (isToday ? '今日花朵・' : '當天的花・')}<b>{f.name}</b></> : <><Icon name="sprout" size={18} />{isToday ? '今日花朵' : '當天的花'}</>}
+            {onOpen && <span className="go-garden">花園<Icon name="chevron" size={14} /></span>}
           </div>
           {big && f && stage >= 0 && <div className="plant-words">{f.words}</div>}
           <div className="plant-ml"><b>{fmt(water)}</b><span> / {fmt(goal)} ml</span></div>
