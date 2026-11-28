@@ -100,26 +100,39 @@ for i, (x, y, s) in enumerate(order):
     dr.ellipse([x - 30 * s, y - 12 * s, x + 30 * s, y + 12 * s], outline=(255, 80, 80), width=3); dr.text((x - 6, y - 6), str(i), fill=(255, 255, 255))
 d.resize((768, 512)).save(sys.argv[3] if len(sys.argv) > 3 else out + '_spots_preview.png')
 
-# ---- 大樹：把樹冠分成幾叢各自擺動，並把背景裡原本的樹葉補成周圍的顏色，擺動時才不會出現疊影 ----
+# ---- 大樹：樹冠分成幾叢各自擺動；只把「葉子底下」的背景補色，葉子之間的天空、樹枝保留原圖 ----
 import cv2
-tree = np.array(Image.open(out + 'tree.webp').convert('RGBA'))
-leafmask = ndimage.binary_opening(tree[..., 3] > 40, iterations=1)
-leafmask[170:360, 245:375] = False   # 路燈（發亮的黃色燈罩不是葉子）
-tree[..., 3] = (np.clip(ndimage.gaussian_filter(leafmask.astype(float), 0.7) * 1.4, 0, 1) * 255).astype(np.uint8)   # 葉子完全不透明
-alpha = tree[..., 3].astype(float)
-solid = leafmask
-lab, n = ndimage.label(alpha > 40)
-cents = ndimage.center_of_mass(alpha > 40, lab, range(1, n + 1))
+src_full = np.array(im).astype(float)
+TW, TH = 860, 380
+a = src_full[:TH, :TW]
+r, g, b = a[..., 0], a[..., 1], a[..., 2]
+mx, mn = a.max(2), a.min(2); sat = (mx - mn) / (mx + 1e-6)
+yy, xx = np.mgrid[0:TH, 0:TW]
+leaf = (sat > 0.18) & (g > 0.9 * r) & (g > b + 20)
+leaf &= ~(((xx > 470) & (yy > 150)) | ((xx > 560) & (sat < 0.32)))     # 溫室藤蔓、遠處背景樹
+leaf[170:380, 245:375] = False                                          # 路燈
+trunk = (r - g > 32) & (b < 150)
+leaf = ndimage.binary_closing(leaf, structure=np.ones((3, 3)), iterations=2)
+leaf = ndimage.binary_fill_holes(leaf) & ~trunk                          # 補起葉子內部的小洞
+leaf = ndimage.binary_opening(leaf, iterations=2)
+lab, n = ndimage.label(leaf)
+sizes = ndimage.sum(leaf, lab, range(1, n + 1))
+leaf = np.isin(lab, [i + 1 for i, v in enumerate(sizes) if v > 150])
+alpha = np.clip(ndimage.gaussian_filter(leaf.astype(float), 0.8) * 1.5, 0, 1)
+rgba = np.dstack([a, alpha * 255]).astype(np.uint8)
+lab, n = ndimage.label(leaf)
+cents = ndimage.center_of_mass(leaf, lab, range(1, n + 1))
 CLUSTERS = [lambda cx, cy: cx < 240 and cy > 140, lambda cx, cy: cx < 330 and cy <= 140,
             lambda cx, cy: 330 <= cx < 520, lambda cx, cy: cx >= 520 or (cx >= 240 and cy > 140)]
+grown = ndimage.grey_dilation(lab, size=(3, 3))     # 讓邊緣羽化的像素也歸到同一叢
 for k, rule in enumerate(CLUSTERS):
     ids = [i + 1 for i, (cy, cx) in enumerate(cents) if rule(cx, cy)]
-    part = tree.copy()
-    part[..., 3] = np.where(np.isin(lab, ids), tree[..., 3], 0)
-    Image.fromarray(part, 'RGBA').save(out + f'tree-{k}.webp', quality=84, method=4)
-bd = np.array(Image.open(out + 'backdrop.webp').convert('RGB'))
+    part = rgba.copy()
+    part[..., 3] = np.where(np.isin(grown, ids), rgba[..., 3], 0)
+    Image.fromarray(part, 'RGBA').save(out + f'tree-{k}.webp', quality=88, method=4)
+bd = np.array(im).copy()
 fill = np.zeros(bd.shape[:2], np.uint8)
-fill[:tree.shape[0], :tree.shape[1]] = ndimage.binary_dilation(solid, iterations=8).astype(np.uint8) * 255
-bd = cv2.inpaint(np.ascontiguousarray(bd[..., ::-1]), fill, 12, cv2.INPAINT_TELEA)[..., ::-1]
-Image.fromarray(bd).save(out + 'backdrop.webp', quality=80, method=4)
+fill[:TH, :TW] = (ndimage.binary_dilation(leaf, iterations=1) & ~trunk).astype(np.uint8) * 255
+bd = cv2.inpaint(np.ascontiguousarray(bd[..., ::-1]), fill, 6, cv2.INPAINT_TELEA)[..., ::-1]
+Image.fromarray(bd).save(out + 'backdrop.webp', quality=82, method=4)
 print('tree clusters + backdrop inpainted')
