@@ -15,14 +15,15 @@ export async function extractFrames(file: Blob, max: number, onProgress?: (done:
     // iOS 需要先播放一下才能跳到指定時間
     await v.play().then(() => v.pause()).catch(() => {})
     const dur = isFinite(v.duration) && v.duration > 0 ? v.duration : 1
-    const count = Math.min(40, Math.max(2, Math.round(dur / 0.8)))
-    const scale = Math.min(1, 1100 / Math.max(v.videoWidth || 1, v.videoHeight || 1))
+    const count = Math.min(80, Math.max(2, Math.round(dur / 0.4)))
+    const scale = Math.min(1, 1400 / Math.max(v.videoWidth || 1, v.videoHeight || 1))
     const c = document.createElement('canvas')
     c.width = Math.max(1, Math.round((v.videoWidth || 720) * scale))
     c.height = Math.max(1, Math.round((v.videoHeight || 1280) * scale))
     const ctx = c.getContext('2d', { willReadFrequently: true })!
+    // 用較細的格子比對，才抓得到只有一小塊（例如上方的數字標籤）改變的畫面
     const tiny = document.createElement('canvas')
-    tiny.width = 24; tiny.height = 40
+    tiny.width = 48; tiny.height = Math.max(48, Math.round((48 * c.height) / c.width))
     const tctx = tiny.getContext('2d', { willReadFrequently: true })!
     const frames: { blob: Blob; sig: number[] }[] = []
     for (let i = 0; i < count; i++) {
@@ -38,9 +39,10 @@ export async function extractFrames(file: Blob, max: number, onProgress?: (done:
       const px = tctx.getImageData(0, 0, tiny.width, tiny.height).data
       const sig: number[] = []
       for (let k = 0; k < px.length; k += 4) sig.push((px[k] + px[k + 1] + px[k + 2]) / 3)
+      // 跟上一張保留的畫面比，有明顯改變的格子數夠多才保留
       const prev = frames[frames.length - 1]
-      const diff = prev ? sig.reduce((a, x, k) => a + Math.abs(x - prev.sig[k]), 0) / sig.length : 999
-      if (diff > 4) {
+      const changed = prev ? sig.reduce((a, x, k) => a + (Math.abs(x - prev.sig[k]) > 28 ? 1 : 0), 0) : 999
+      if (changed >= 4) {
         const blob = await new Promise<Blob | null>((r) => c.toBlob(r, 'image/jpeg', 0.82))
         if (blob) frames.push({ blob, sig })
       }
