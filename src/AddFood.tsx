@@ -264,7 +264,7 @@ function PhotoMeal({ dietInfo, onBack, onAdd }: { dietInfo: string; onBack: () =
 
   return (
     <div className="pick scroll">
-      <input ref={fileRef} type="file" accept="image/*" capture="environment" hidden onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) choose(f) }} />
+      <input ref={fileRef} type="file" accept="image/*" hidden onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) choose(f) }} />
       {!res && (
         <div className="seg" role="group" aria-label="用餐方式">
           <button className={!group ? 'on' : ''} onClick={() => setGroup(false)}><Icon name="user" size={18} />自己吃</button>
@@ -387,13 +387,13 @@ function Scanner({ customFoods, dietInfo, onBack, onFound, onForm }: {
 
   return (
     <div className="pick scroll">
-      <input ref={codeRef} type="file" accept="image/*" capture="environment" hidden onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) fromPhoto(f) }} />
-      <input ref={labelRef} type="file" accept="image/*" capture="environment" hidden onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) readLabel(f) }} />
+      <input ref={codeRef} type="file" accept="image/*" hidden onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) fromPhoto(f) }} />
+      <input ref={labelRef} type="file" accept="image/*" hidden onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) readLabel(f) }} />
       {(status === 'idle' || status === 'decoding') && (
         <>
           <div className="center" style={{ padding: '16px 0 8px' }}>
-            <p className="muted">拍下包裝上的條碼。掃過並存起來的食物，下次拍條碼就會直接找到。</p>
-            <button className="primary" onClick={() => codeRef.current?.click()} disabled={status === 'decoding'}>{status === 'decoding' ? '讀取條碼中…' : <><Icon name="barcode" size={18} />拍條碼</>}</button>
+            <p className="muted">拍下或從相簿選一張包裝上的條碼照片。掃過並存起來的食物，下次拍條碼就會直接找到。</p>
+            <button className="primary" onClick={() => codeRef.current?.click()} disabled={status === 'decoding'}>{status === 'decoding' ? '讀取條碼中…' : <><Icon name="barcode" size={18} />拍照或選條碼照片</>}</button>
           </div>
           <div className="row">
             <input className="search grow" inputMode="numeric" placeholder="或輸入條碼數字" value={manual} onChange={(e) => setManual(e.target.value.replace(/\D/g, ''))} />
@@ -406,7 +406,7 @@ function Scanner({ customFoods, dietInfo, onBack, onFound, onForm }: {
         <div className="center" style={{ padding: '12px 0' }}>
           <p>條碼 {code} 還沒有存過。</p>
           <p className="muted">拍下包裝背面的「營養標示」，Claude 會幫你讀出數值。存起來後，下次拍這個條碼就會直接找到。</p>
-          <button className="primary" onClick={() => labelRef.current?.click()}><Icon name="camera" size={18} />拍營養標示</button>
+          <button className="primary" onClick={() => labelRef.current?.click()}><Icon name="camera" size={18} />拍照或選營養標示照片</button>
         </div>
       )}
       {err && <div className="alert">{err}</div>}
