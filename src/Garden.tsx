@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import type { useStore } from './store'
 import { addDays, fmtDate, parseISO, toISO, todayISO } from './util'
 import { collection, dayFlower, dayTasks, FLOWERS, flowerOf, flowerSrc, GROUPS, STAGES, stageOf, type Flower } from './garden'
@@ -7,6 +7,7 @@ import { streak } from './habits'
 import { getSample } from './ai'
 import { Icon } from './icons'
 import { Sheet, fmt } from './ui'
+import type React from 'react'
 import GardenScene from './GardenScene'
 
 type Store = ReturnType<typeof useStore>
@@ -18,7 +19,6 @@ export default function Garden({ store }: { store: Store }) {
   const got = useMemo(() => collection(data), [data])
   const [month, setMonth] = useState(today.slice(0, 7))
   const [day, setDay] = useState<string | null>(null)
-  const [group, setGroup] = useState(0)
   const [dex, setDex] = useState<Flower | null>(null)
   const { tasks, done } = dayTasks(data)
   const bloomsThisMonth = Object.keys(data.water).filter((d) => d.startsWith(today.slice(0, 7)) && stageOf(data.water[d], goal) === 4).length
@@ -62,22 +62,15 @@ export default function Garden({ store }: { store: Store }) {
 
       <section className="g-card">
         <h2 className="g-sec">花卉圖鑑<em>已收集 {got.size} / {FLOWERS.length}</em></h2>
-        <div className="g-tabs" role="tablist">
-          {GROUPS.map((g, i) => (
-            <button key={g} role="tab" aria-selected={group === i} className={group === i ? 'on' : ''} onClick={() => setGroup(i)}>
-              {g}<small>{FLOWERS.filter((f) => f.group === i && got.has(f.id)).length}/10</small>
-            </button>
-          ))}
-        </div>
         <div className="dex">
-          {FLOWERS.filter((f) => f.group === group).map((f) => (
+          {FLOWERS.map((f) => (
             <button key={f.id} className={got.has(f.id) ? '' : 'lock'} onClick={() => setDex(f)}>
               <img src={flowerSrc(f.id, 'p')} alt="" loading="lazy" />
               <span>{got.has(f.id) ? f.name : '？？？'}</span>
             </button>
           ))}
         </div>
-        <p className="g-hint">還沒收集的花是灰色剪影。每天第一次澆水時，會優先抽還沒收集過的花。</p>
+        <p className="g-hint">還沒收集的花是灰色剪影。每天第一次澆水時，會優先抽還沒收集過的花。種過紫藤花或玫瑰，溫室兩側的藤蔓也會開花。</p>
       </section>
 
       {day && <DaySheet store={store} date={day} onClose={() => setDay(null)} />}
@@ -93,8 +86,25 @@ function Calendar({ store, month, setMonth, onPick }: { store: Store; month: str
   const first = parseISO(month + '-01')
   const days = new Date(first.getFullYear(), first.getMonth() + 1, 0).getDate()
   const lead = first.getDay()
-  const shift = (n: number) => { const d = new Date(first); d.setMonth(d.getMonth() + n); setMonth(toISO(d).slice(0, 7)) }
   const canNext = month < today.slice(0, 7)
+  const [dir, setDir] = useState<'l' | 'r' | ''>('')
+  const shift = (n: number) => {
+    if (n > 0 && !canNext) { setDir(''); return }
+    const d = new Date(first); d.setMonth(d.getMonth() + n)
+    setDir(n > 0 ? 'l' : 'r')
+    setMonth(toISO(d).slice(0, 7))
+  }
+  // 左右滑動切換月份：往左滑看下個月、往右滑看上個月
+  const touch = useRef<{ x: number; y: number } | null>(null)
+  const swipe = {
+    onTouchStart: (e: React.TouchEvent) => { touch.current = { x: e.touches[0].clientX, y: e.touches[0].clientY } },
+    onTouchEnd: (e: React.TouchEvent) => {
+      const t = touch.current; touch.current = null
+      if (!t) return
+      const dx = e.changedTouches[0].clientX - t.x, dy = e.changedTouches[0].clientY - t.y
+      if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) * 1.5) shift(dx < 0 ? 1 : -1)
+    }
+  }
   return (
     <section className="g-card">
       <h2 className="g-sec">花園月曆
@@ -104,7 +114,7 @@ function Calendar({ store, month, setMonth, onPick }: { store: Store; month: str
           <button onClick={() => shift(1)} disabled={!canNext} aria-label="下個月"><Icon name="chevron" size={18} /></button>
         </span>
       </h2>
-      <div className="cal">
+      <div className={'cal slide-' + dir} key={month} {...swipe}>
         {'日一二三四五六'.split('').map((w) => <div className="h" key={w}>{w}</div>)}
         {Array.from({ length: lead }, (_, i) => <div key={'b' + i} />)}
         {Array.from({ length: days }, (_, i) => {
@@ -123,7 +133,7 @@ function Calendar({ store, month, setMonth, onPick }: { store: Store; month: str
           )
         })}
       </div>
-      <div className="legend"><span><i className="lg bloom" />開花＝喝水達標</span><span><i className="lg grow" />小株＝沒喝夠</span><span><i className="lg lg-stamp" />今日完成</span></div>
+      <div className="legend"><span className="swipe-note">左右滑動切換月份</span><span><i className="lg bloom" />開花＝喝水達標</span><span><i className="lg grow" />小株＝沒喝夠</span><span><i className="lg lg-stamp" />今日完成</span></div>
     </section>
   )
 }

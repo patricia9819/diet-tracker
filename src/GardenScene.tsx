@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { useStore } from './store'
-import { dayFlower, flowerOf, flowerSrc, STAGES, stageOf, type Flower } from './garden'
+import { collection, dayFlower, flowerOf, flowerSrc, STAGES, stageOf, type Flower } from './garden'
 import { fmtDate, todayISO } from './util'
 import layout from '../public/garden/spots.json'
 
@@ -55,6 +55,10 @@ export default function GardenScene({ store }: { store: Store }) {
   const blooms = useMemo(() => Object.keys(data.water).filter((d) => d < today && stageOf(data.water[d], goal) === 4).sort(), [data.water, goal, today])
   const shown = blooms.slice(-SPOTS.length)
   const planted = shown.map((d, i) => ({ date: d, f: flowerOf(dayFlower(data, d)), spot: SPOTS[i] })).filter((p): p is { date: string; f: Flower; spot: typeof SPOTS[number] } => !!p.f)
+  // 溫室兩側的藤蔓：種過紫藤花就長出紫藤，種過玫瑰／白玫瑰就爬滿玫瑰
+  const got = useMemo(() => collection(data), [data])
+  const hasWisteria = got.has('f05')
+  const hasRose = got.has('f04') || got.has('f21')
   const todayStage = stageOf(data.water[today] ?? 0, goal)
   const todayFlower = flowerOf(dayFlower(data, today))
   const todaySpot = SPOTS[Math.min(shown.length, SPOTS.length - 1)]
@@ -97,7 +101,8 @@ export default function GardenScene({ store }: { store: Store }) {
         <div className={'scene' + (night ? ' night' : '')} role="img" aria-label={`我的花園，${phaseName(m)}，種了 ${planted.length} 叢花`}>
           <img className="scene-bg" src="garden/backdrop.webp" alt="" draggable={false} />
           <img className="scene-tree" src="garden/tree.webp" alt="" draggable={false} style={{ left: 0, top: 0, width: px(860), height: py(360) }} />
-          <img className="scene-vines" src="garden/vines.webp" alt="" draggable={false} style={{ left: px(495), top: py(190), width: px(240), height: py(280) }} />
+          <img key={hasWisteria ? 'w1' : 'w0'} className={'scene-vines' + (hasWisteria ? ' bloomed' : '')} src={hasWisteria ? 'garden/vines-wisteria.webp' : 'garden/vines.webp'} alt="" draggable={false} style={{ left: px(480), top: py(170), width: px(280), height: py(310) }} />
+          <img key={hasRose ? 'r1' : 'r0'} className={'scene-vines right' + (hasRose ? ' bloomed' : '')} src={hasRose ? 'garden/vines-rose.webp' : 'garden/vines-right.webp'} alt="" draggable={false} style={{ left: px(1020), top: py(150), width: px(280), height: py(370) }} />
           {sun && <span className="sun" style={{ left: px(sun.x), top: py(sun.y), opacity: 1 - light.stars }} />}
           {moon && night && <span className="moon" style={{ left: px(moon.x), top: py(moon.y), opacity: light.stars }} />}
           <span className="fountain" style={{ left: px(1250), top: py(700) }} aria-hidden="true"><i /><i /><i /></span>
@@ -139,7 +144,6 @@ export default function GardenScene({ store }: { store: Store }) {
       </div>
       <span className="scene-time">{phaseName(m)} {String(now.getHours()).padStart(2, '0')}:{String(now.getMinutes()).padStart(2, '0')}</span>
       {hint && <span className="scene-hint" aria-hidden="true">‹ 左右滑動看整座花園 ›</span>}
-      {planted.length === 0 && <span className="scene-empty">花圃還是空的。<br />喝水達標的那天，會在花圃種下一小叢花。</span>}
     </div>
   )
 }

@@ -1,5 +1,5 @@
 """從「空花圃」插畫產生活花園的圖層與種花位置。
-用法：python3 scripts/garden-scene.py <空花圃插畫.png> <輸出資料夾>
+用法：python3 scripts/garden-scene.py <空花圃插畫.png> <輸出資料夾> <預覽圖> <開滿花的插畫.png>
 輸出：backdrop.webp（整張背景）、tree.webp / vines.webp（隨風搖曳的覆蓋層）、spots.json（每一小叢花的位置，依種植順序）"""
 import sys, json
 import numpy as np
@@ -21,7 +21,16 @@ def overlay(box, name, ellipse):
     c.save(out + name, quality=84, method=4)
 
 overlay((0, 0, 860, 360), 'tree.webp', (-0.3, -0.6, 1.0, 0.95))       # 左上大樹的樹冠
-overlay((495, 190, 735, 470), 'vines.webp', (0.05, -0.1, 0.95, 1.0))   # 溫室左側的藤蔓
+LEFT, RIGHT = (480, 170, 760, 480), (1020, 150, 1300, 520)
+overlay(LEFT, 'vines.webp', (0.05, -0.1, 0.95, 1.0))                   # 溫室左側的藤蔓
+overlay(RIGHT, 'vines-right.webp', (0.08, -0.05, 0.92, 1.0))          # 溫室右側的藤蔓
+if len(sys.argv) > 4:                                                  # 開滿花的版本：紫藤、玫瑰藤
+    full = Image.open(sys.argv[4]).convert('RGB')
+    keep = im
+    im = full
+    overlay(LEFT, 'vines-wisteria.webp', (0.05, -0.1, 0.95, 1.0))
+    overlay(RIGHT, 'vines-rose.webp', (0.08, -0.05, 0.92, 1.0))
+    im = keep
 
 # 找出土壤花圃（棕色區域），再補上被植物擋住的兩小塊
 a = np.array(im).astype(float)

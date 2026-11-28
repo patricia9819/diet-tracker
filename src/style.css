@@ -647,3 +647,16 @@ body:has(.garden-app) { background: var(--gp-bg); }
 @media (prefers-reduced-motion: reduce) { .scene-vines, .fountain i, .scene-hint { animation: none; } }
 
 .water-btns { grid-template-columns: 40px 1fr 1fr 1fr 40px; }
+
+/* 月曆左右滑動 */
+.cal { touch-action: pan-y; }
+.cal.slide-l { animation: calInL .32s ease-out; }
+.cal.slide-r { animation: calInR .32s ease-out; }
+@keyframes calInL { from { transform: translateX(28%); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes calInR { from { transform: translateX(-28%); opacity: 0; } to { transform: none; opacity: 1; } }
+.swipe-note { width: 100%; }
+.dex { grid-template-columns: repeat(4, 1fr); }
+.scene-vines.right { transform-origin: 50% 0%; animation: wisteriaSway 6s ease-in-out -2s infinite; }
+.scene-vines.bloomed { animation: vineBloom 1.4s ease-out, wisteriaSway 5.2s ease-in-out 1.4s infinite; }
+@keyframes vineBloom { from { opacity: 0; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .cal.slide-l, .cal.slide-r, .scene-vines.right, .scene-vines.bloomed { animation: none; } }
