@@ -39,7 +39,7 @@ def seeds(a):
         out.append(sorted(pts))
     return out
 
-def cutout(rgb):
+def cutout(rgb, white=False):
     c = rgb.astype(float)
     edge = np.concatenate([c[0], c[-1], c[:, 0], c[:, -1]])
     bg = np.median(edge, 0)
@@ -68,8 +68,29 @@ def cutout(rgb):
             if h < 9 and w > 3 * h: continue        # 上一張卡片的邊框線（又細又長）
             if sz >= sizes.max() * 0.3: keep |= lab == (i + 1)
         m = keep
-    m = ndimage.binary_dilation(m, iterations=1)
-    a = ndimage.gaussian_filter(m.astype(float), 0.8)
+    # 去掉紙張色（米白、奶油色的紙雕陰影與標籤）：只去掉和圖片邊緣相連的那一片，花瓣內部的白色保留
+    m_old = m.copy()
+    paper = warm & (lum > 188) & (sat < 0.32) & ((r - g) < 28) & ~((sat < 0.06) & ~m)
+    paper |= ~m
+    lab_p, _ = ndimage.label(paper)
+    edge_ids = np.unique(np.concatenate([lab_p[0], lab_p[-1], lab_p[:, 0], lab_p[:, -1]]))
+    bgmask = np.isin(lab_p, edge_ids[edge_ids > 0])
+    m &= ~bgmask
+    # 白色花和紙張顏色太接近，去背會吃掉花瓣：這時改用原本的輪廓，往內收 2 px 去掉白邊
+    if white:
+        m = ndimage.binary_erosion(m_old, iterations=3)
+    # 土壤以下（標籤、卡片）切掉：只看圖片下半部的土壤
+    soil = (r > 120) & (g > 70) & (g < 150) & (b < 110) & (r - g > 30)
+    soil[: int(soil.shape[0] * 0.55)] = False
+    rows = np.where(soil.sum(1) > 2)[0]
+    if len(rows): m[rows.max() + 3:] = False
+    m = ndimage.binary_opening(m, iterations=1)
+    lab, n = ndimage.label(m)
+    if n:
+        sizes = ndimage.sum(np.ones_like(lab), lab, range(1, n + 1))
+        m = np.isin(lab, [i + 1 for i, sz in enumerate(sizes) if sz >= sizes.max() * 0.08])
+    a = ndimage.gaussian_filter(m.astype(float), 0.6)
+    a = np.clip((a - 0.2) * 1.6, 0, 1)
     return np.dstack([c, np.clip(a * 1.15, 0, 1) * 255]).astype(np.uint8)
 
 manifest = []
@@ -83,7 +104,7 @@ for ci, f in enumerate(CHARTS):
             sizes = []
             for si, (dx0, dx1) in enumerate(STAGE_X):
                 box = (sx + dx0, sy - 13, sx + dx1, sy + 14) if si == 0 else (sx + dx0, sy - (91 if si == 4 else 84), sx + dx1, sy + 27)
-                rgba = Image.fromarray(cutout(np.array(im.crop(box))), 'RGBA')
+                rgba = Image.fromarray(cutout(np.array(im.crop(box)), white=(ci == 2 or fid == 'f03')), 'RGBA')
                 bb = rgba.getbbox()
                 rgba = rgba.crop(bb) if bb else rgba
                 rgba = rgba.resize((rgba.width * SCALE, rgba.height * SCALE), Image.LANCZOS)

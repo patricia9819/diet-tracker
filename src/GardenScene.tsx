@@ -116,6 +116,10 @@ export default function GardenScene({ store }: { store: Store }) {
             </svg>
           )}
           <span className="fountain" style={{ left: px(1250), top: py(700) }} aria-hidden="true"><i /><i /><i /></span>
+          {/* 噴水池往下流的水：上層碗邊→下層碗、下層碗邊→水池 */}
+          {[[1200, 548, 42], [1222, 552, 38], [1278, 552, 38], [1300, 548, 42], [1156, 598, 92], [1180, 604, 86], [1322, 604, 86], [1346, 598, 92]].map(([x, y, h], i) => (
+            <span key={i} className="water-fall" style={{ left: px(x), top: py(y), height: py(h), animationDelay: `${-i * 0.23}s` }} aria-hidden="true" />
+          ))}
 
           {items.map((it) => {
             const [w, h] = it.f.sizes[it.stage]

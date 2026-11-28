@@ -11,25 +11,41 @@ im = Image.open(src).convert('RGB')
 W, H = im.size
 im.save(out + 'backdrop.webp', quality=80, method=4)
 
-def overlay(box, name, ellipse):
+def overlay(box, name, ellipse, plant_only=False):
     c = im.crop(box).convert('RGBA')
     w, h = c.size
     m = Image.new('L', (w, h), 0)
     ImageDraw.Draw(m).ellipse([ellipse[0] * w, ellipse[1] * h, ellipse[2] * w, ellipse[3] * h], fill=255)
     m = m.filter(ImageFilter.GaussianBlur(min(w, h) * 0.08))
+    if plant_only:
+        # 只留葉子與花（綠、紫、粉），白色的玻璃屋框架不動
+        a = np.array(c.convert('RGB')).astype(float)
+        r, g, b = a[..., 0], a[..., 1], a[..., 2]
+        mx, mn = a.max(2), a.min(2); sat = (mx - mn) / (mx + 1e-6)
+        leaf = (sat > 0.18) & (g > 0.9 * r) & (g > b + 20)
+        purple = (sat > 0.12) & (b > g + 8)
+        pink = (sat > 0.2) & (r - g > 22) & (r > 180) & (b > g - 22)
+        p = ndimage.binary_opening(leaf | purple | pink, iterations=1)
+        p = ndimage.binary_closing(p, iterations=3)
+        lab, n = ndimage.label(p)
+        if n:
+            sz = ndimage.sum(p, lab, range(1, n + 1))
+            p = np.isin(lab, [i + 1 for i, v in enumerate(sz) if v > 60])
+        p = ndimage.gaussian_filter(p.astype(float), 0.8)
+        m = Image.fromarray((np.array(m).astype(float) * np.clip(p * 1.3, 0, 1)).astype(np.uint8))
     c.putalpha(m)
     c.save(out + name, quality=84, method=4)
 
 overlay((0, 0, 860, 360), 'tree.webp', (-0.3, -0.6, 1.0, 0.95))       # 左上大樹的樹冠
 LEFT, RIGHT = (480, 170, 760, 480), (1020, 150, 1300, 520)
-overlay(LEFT, 'vines.webp', (0.05, -0.1, 0.95, 1.0))                   # 溫室左側的藤蔓
-overlay(RIGHT, 'vines-right.webp', (0.08, -0.05, 0.92, 1.0))          # 溫室右側的藤蔓
+overlay(LEFT, 'vines.webp', (0.05, -0.1, 0.95, 1.0), True)                   # 溫室左側的藤蔓
+overlay(RIGHT, 'vines-right.webp', (0.08, -0.05, 0.92, 1.0), True)          # 溫室右側的藤蔓
 if len(sys.argv) > 4:                                                  # 開滿花的版本：紫藤、玫瑰藤
     full = Image.open(sys.argv[4]).convert('RGB')
     keep = im
     im = full
-    overlay(LEFT, 'vines-wisteria.webp', (0.05, -0.1, 0.95, 1.0))
-    overlay(RIGHT, 'vines-rose.webp', (0.08, -0.05, 0.92, 1.0))
+    overlay(LEFT, 'vines-wisteria.webp', (0.05, -0.1, 0.95, 1.0), True)
+    overlay(RIGHT, 'vines-rose.webp', (0.08, -0.05, 0.92, 1.0), True)
     im = keep
 
 # 找出土壤花圃（棕色區域），再補上被植物擋住的兩小塊
