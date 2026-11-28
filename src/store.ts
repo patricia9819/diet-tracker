@@ -28,7 +28,12 @@ function split(d: AppData): Docs {
   for (const [date, wl] of Object.entries(d.waterLog ?? {})) if (wl.length) m(date).waterLog[date] = wl
   for (const [date, f] of Object.entries(d.garden ?? {})) m(date).garden[date] = f
   // 餐點縮圖一天一份文件，避免每月文件太大
-  for (const [date, ph] of Object.entries(d.photos ?? {})) if (ph && Object.keys(ph).length) docs['p-' + date] = { ...ph }
+  // 照片一餐一份文件（p-日期-餐別），避免單一文件太大
+  for (const [date, ph] of Object.entries(d.photos ?? {}))
+    for (const [meal, v] of Object.entries(ph ?? {})) {
+      const list = !v ? [] : Array.isArray(v) ? v : [v]
+      if (list.length) docs[`p-${date}-${meal}`] = { list }
+    }
   return docs
 }
 
@@ -41,7 +46,15 @@ function join(docs: Docs): AppData {
     d.advice = main.advice ?? []
   }
   for (const [k, v] of Object.entries(docs)) {
-    if (k.startsWith('p-')) { d.photos[k.slice(2)] = v as AppData['photos'][string]; continue }
+    if (k.startsWith('p-')) {
+      const date = k.slice(2, 12), meal = k.slice(13)
+      if (meal) d.photos[date] = { ...d.photos[date], [meal]: (v as { list?: string[] }).list ?? [] }
+      else for (const [mk, mv] of Object.entries(v as Record<string, string | string[]>)) {   // 舊格式：一天一份
+        const prev = d.photos[date]?.[mk as keyof AppData['photos'][string]]
+        if (!prev) d.photos[date] = { ...d.photos[date], [mk]: Array.isArray(mv) ? mv : [mv] }
+      }
+      continue
+    }
     if (!k.startsWith('m-')) continue
     const m = v as Partial<AppData>
     d.logs.push(...(m.logs ?? []))

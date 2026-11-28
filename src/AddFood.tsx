@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { useStore } from './store'
-import { MEALS, type FoodItem, type Meal } from './types'
+import { MEALS, mealPhotos, type FoodItem, type Meal } from './types'
 import { BUILTIN_FOODS } from './foods'
 import { uid } from './util'
 import { allowedFood, avoidsFive, dietPrompt } from './diet'
@@ -24,16 +24,16 @@ const toForm = (f: Omit<FoodItem, 'id'>, note = ''): Form => ({
 })
 
 /** 把照片縮成小縮圖（存在紀錄裡顯示用） */
-async function makeThumb(photo: Blob): Promise<string> {
+export async function makeThumb(photo: Blob): Promise<string> {
   try {
     const bmp = await createImageBitmap(photo)
-    const side = 112
+    const side = 220
     const c = document.createElement('canvas')
     c.width = c.height = side
     const sc = side / Math.min(bmp.width, bmp.height)
     const w = bmp.width * sc, h = bmp.height * sc
     c.getContext('2d')!.drawImage(bmp, (side - w) / 2, (side - h) / 2, w, h)
-    return c.toDataURL('image/jpeg', 0.7)
+    return c.toDataURL('image/jpeg', 0.72)
   } catch {
     return ''
   }
@@ -66,10 +66,10 @@ export default function AddFood({ store, date, meal: initialMeal, onClose }: { s
 
   const results = q.trim() ? all.filter((f) => f.name.toLowerCase().includes(q.trim().toLowerCase())) : null
 
-  const addMany = (items: { f: FoodItem; s: number }[], thumb = '') => {
+  const addMany = (items: { f: FoodItem; s: number }[], thumbs: string[] = []) => {
     update((d) => ({
       ...d,
-      photos: thumb ? { ...d.photos, [date]: { ...(d.photos?.[date] ?? {}), [meal]: thumb } } : d.photos,
+      photos: thumbs.length ? { ...d.photos, [date]: { ...(d.photos?.[date] ?? {}), [meal]: [...mealPhotos(d, date, meal), ...thumbs].slice(-8) } } : d.photos,
       logs: [...d.logs, ...items.filter((x) => x.s > 0).map(({ f, s }) => ({ id: uid(), date, meal, foodId: f.id, name: f.name, unit: f.unit, servings: s, kcal: f.kcal, protein: f.protein, carbs: f.carbs, fat: f.fat }))]
     }))
     celebrate('leaves')
@@ -214,7 +214,7 @@ const SOLO_LEVELS = [
   { label: '一份', k: 1 }
 ]
 
-function PhotoMeal({ dietInfo, onBack, onAdd }: { dietInfo: string; onBack: () => void; onAdd: (x: { f: FoodItem; s: number }[], thumb?: string) => void }) {
+function PhotoMeal({ dietInfo, onBack, onAdd }: { dietInfo: string; onBack: () => void; onAdd: (x: { f: FoodItem; s: number }[], thumbs?: string[]) => void }) {
   const fileRef = useRef<HTMLInputElement>(null)
   const [shots, setShots] = useState<{ file: File; url: string }[]>([])
   const [hint, setHint] = useState('')
@@ -264,7 +264,7 @@ function PhotoMeal({ dietInfo, onBack, onAdd }: { dietInfo: string; onBack: () =
       kcal: Math.round(it.kcal), protein: it.protein, carbs: it.carbs, fat: it.fat
     },
     s: Math.round(servingsOf(i) * 1000) / 1000
-  }] : []), shots[0] ? await makeThumb(shots[0].file) : '')
+  }] : []), (await Promise.all(shots.map((x) => makeThumb(x.file)))).filter(Boolean))
 
   return (
     <div className="pick scroll">

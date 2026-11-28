@@ -1,12 +1,12 @@
 import { useState } from 'react'
 import type { useStore } from './store'
-import { MEALS, type Meal } from './types'
+import { MEALS, mealPhotos, type LogEntry, type Meal } from './types'
 import { r1, sortedWeights, sumLogs, targets, todayISO } from './util'
 import AddFood from './AddFood'
 import { streak } from './habits'
 import { dayActivity } from './activity'
 import { Icon } from './icons'
-import { Bar, DateButton, PageHead, fmt } from './ui'
+import { Bar, DateButton, PageHead, Sheet, fmt } from './ui'
 import { ask } from './dialogs'
 import WaterPlant from './WaterPlant'
 
@@ -25,6 +25,8 @@ export default function Today({ store, currentKg, goBody, goGarden }: { store: S
   const [date, setDate] = useState(todayISO())
   const [adding, setAdding] = useState<Meal | null>(null)
   const [open, setOpen] = useState<Meal | null>(null)
+  const [editing, setEditing] = useState<LogEntry | null>(null)
+  const [viewing, setViewing] = useState<{ meal: Meal; i: number } | null>(null)
   const t = targets(p, currentKg)
   const dayLogs = data.logs.filter((l) => l.date === date)
   const total = sumLogs(dayLogs)
@@ -120,24 +122,30 @@ export default function Today({ store, currentKg, goBody, goGarden }: { store: S
         {MEALS.map((m) => {
           const items = dayLogs.filter((l) => l.meal === m.key)
           const sub = Math.round(sumLogs(items).kcal)
-          const thumb = data.photos?.[date]?.[m.key]
+          const pics = mealPhotos(data, date, m.key)
+          const thumb = pics[0]
           const isOpen = open === m.key
           return (
             <div className={isOpen ? 'meal open' : 'meal'} key={m.key}>
               <button className="meal-row" onClick={() => (items.length ? setOpen(isOpen ? null : m.key) : setAdding(m.key))} aria-expanded={isOpen}>
-                {thumb ? <img className="thumb" src={thumb} alt="" /> : <span className="thumb ph"><Icon name={MEAL_ICON[m.key]} size={22} /></span>}
+                {thumb ? <span className="thumb-wrap"><img className="thumb" src={thumb} alt="" />{pics.length > 1 && <em className="thumb-n">{pics.length}</em>}</span> : <span className="thumb ph"><Icon name={MEAL_ICON[m.key]} size={22} /></span>}
                 <span className="meal-name">{m.label}</span>
                 <span className="meal-kcal">{items.length ? `${fmt(sub)} kcal` : <em>點此新增</em>}</span>
                 <Icon name="chevron" size={18} className="chev" />
               </button>
               {isOpen && (
                 <div className="meal-items">
+                  {pics.length > 0 && (
+                    <div className="meal-pics">
+                      {pics.map((src, i) => <button key={i} onClick={() => setViewing({ meal: m.key, i })} aria-label={`看第 ${i + 1} 張照片`}><img src={src} alt="" /></button>)}
+                    </div>
+                  )}
                   {items.map((l) => (
                     <div className="item" key={l.id}>
-                      <div className="grow">
+                      <button className="grow item-edit" onClick={() => setEditing(l)} aria-label={`修改 ${l.name}`}>
                         <div>{l.name}</div>
-                        <small className="muted">{l.servings === 1 ? '' : l.servings < 1 ? `吃了約 ${Math.round(l.servings * 100)}%・` : `${r1(l.servings)} × `}{l.unit}</small>
-                      </div>
+                        <small className="muted">{l.servings === 1 ? '' : l.servings < 1 ? `吃了約 ${Math.round(l.servings * 100)}%・` : `${r1(l.servings)} × `}{l.unit}<Icon name="pencil" size={12} className="edit-hint" /></small>
+                      </button>
                       <span className="num">{fmt(l.kcal * l.servings)}</span>
                       <button className="icon-btn sm" onClick={() => removeLog(l.id, l.name)} aria-label={`刪除 ${l.name}`}><Icon name="close" size={16} /></button>
                     </div>
@@ -152,7 +160,73 @@ export default function Today({ store, currentKg, goBody, goGarden }: { store: S
 
       <p className="note">熱量與營養數值為估計，僅供參考，不能取代醫療建議。</p>
 
+      {editing && <EditLog store={store} log={editing} onClose={() => setEditing(null)} />}
+      {viewing && (() => {
+        const pics = mealPhotos(data, date, viewing.meal)
+        const src = pics[viewing.i]
+        if (!src) return null
+        return (
+          <Sheet title={`${MEALS.find((x) => x.key === viewing.meal)!.label}照片 ${viewing.i + 1} / ${pics.length}`} onClose={() => setViewing(null)}>
+            <img className="photo-big" src={src} alt="" />
+            <div className="row between" style={{ marginTop: 12 }}>
+              <button className="ghost" disabled={viewing.i === 0} onClick={() => setViewing({ ...viewing, i: viewing.i - 1 })}><Icon name="chevronLeft" size={16} />上一張</button>
+              <button className="ghost" onClick={async () => {
+                if (!(await ask('刪除這張照片？（不會刪除食物紀錄）', '刪除'))) return
+                update((d) => ({ ...d, photos: { ...d.photos, [date]: { ...d.photos[date], [viewing.meal]: mealPhotos(d, date, viewing.meal).filter((_, j) => j !== viewing.i) } } }))
+                setViewing(pics.length > 1 ? { ...viewing, i: Math.max(0, viewing.i - 1) } : null)
+              }}><Icon name="trash" size={16} />刪除</button>
+              <button className="ghost" disabled={viewing.i >= pics.length - 1} onClick={() => setViewing({ ...viewing, i: viewing.i + 1 })}>下一張<Icon name="chevron" size={16} /></button>
+            </div>
+          </Sheet>
+        )
+      })()}
       {adding && <AddFood store={store} date={date} meal={adding} onClose={() => setAdding(null)} />}
     </>
+  )
+}
+
+/** 修改一筆食物紀錄：名稱、份量、每份的熱量與營養素、餐別 */
+function EditLog({ store, log, onClose }: { store: Store; log: LogEntry; onClose: () => void }) {
+  const [f, setF] = useState({
+    name: log.name, unit: log.unit, servings: String(r1(log.servings)), meal: log.meal,
+    kcal: String(Math.round(log.kcal)), protein: String(r1(log.protein)), carbs: String(r1(log.carbs)), fat: String(r1(log.fat))
+  })
+  const num = (v: string) => { const n = parseFloat(v); return isFinite(n) && n >= 0 ? n : 0 }
+  const sv = num(f.servings)
+  const save = () => {
+    if (!f.name.trim()) return
+    if (!(sv > 0)) return
+    store.update((d) => ({ ...d, logs: d.logs.map((l) => (l.id === log.id ? { ...l, name: f.name.trim(), unit: f.unit.trim() || '1 份', servings: sv, meal: f.meal, kcal: num(f.kcal), protein: num(f.protein), carbs: num(f.carbs), fat: num(f.fat) } : l)) }))
+    onClose()
+  }
+  const remove = async () => {
+    if (await ask(`刪除「${log.name}」？`, '刪除')) { store.update((d) => ({ ...d, logs: d.logs.filter((l) => l.id !== log.id) })); onClose() }
+  }
+  const field = (k: 'kcal' | 'protein' | 'carbs' | 'fat', label: string) => (
+    <label className="field">{label}<input inputMode="decimal" value={f[k]} onChange={(e) => setF({ ...f, [k]: e.target.value })} /></label>
+  )
+  return (
+    <Sheet title="修改食物" onClose={onClose}>
+      <div className="form">
+        <label className="field">名稱<input value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} /></label>
+        <label className="field">一份是多少<input value={f.unit} onChange={(e) => setF({ ...f, unit: e.target.value })} placeholder="例如 1 碗約 200g" /></label>
+        <label className="field">吃了幾份
+          <div className="row">
+            {[0.25, 0.5, 0.75, 1, 1.5, 2].map((v) => <button type="button" key={v} className={sv === v ? 'chip on' : 'chip'} onClick={() => setF({ ...f, servings: String(v) })}>{v}</button>)}
+            <input inputMode="decimal" value={f.servings} onChange={(e) => setF({ ...f, servings: e.target.value })} aria-label="份數" />
+          </div>
+        </label>
+        <h3 className="sec">每份的營養</h3>
+        <div className="grid2">{field('kcal', '熱量（大卡）')}{field('protein', '蛋白質（g）')}{field('carbs', '碳水（g）')}{field('fat', '脂肪（g）')}</div>
+        <label className="field">哪一餐
+          <div className="row">{MEALS.map((m) => <button type="button" key={m.key} className={f.meal === m.key ? 'chip on' : 'chip'} onClick={() => setF({ ...f, meal: m.key })}>{m.label}</button>)}</div>
+        </label>
+        <div className="preview">合計 <b className="accent-num">{fmt(num(f.kcal) * sv)}</b> 大卡・蛋白質 {r1(num(f.protein) * sv)} g・碳水 {r1(num(f.carbs) * sv)} g・脂肪 {r1(num(f.fat) * sv)} g</div>
+        <div className="btn-pair">
+          <button className="btn-line" onClick={remove}><Icon name="trash" size={16} />刪除</button>
+          <button className="btn-dark" onClick={save}>儲存</button>
+        </div>
+      </div>
+    </Sheet>
   )
 }
