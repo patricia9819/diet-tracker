@@ -4,7 +4,7 @@ import { MEALS, type FoodItem, type Meal } from './types'
 import { BUILTIN_FOODS } from './foods'
 import { uid } from './util'
 import { allowedFood, avoidsFive, dietPrompt } from './diet'
-import { friendlyError, readNutritionLabel, recognizeMeal, type MealResult } from './ai'
+import { friendlyError, maxImages, readNutritionLabel, recognizeMeal, type MealResult } from './ai'
 import { decodeBarcode } from './barcode'
 import { celebrate, toast } from './dialogs'
 import { Icon } from './icons'
@@ -216,8 +216,7 @@ const SOLO_LEVELS = [
 
 function PhotoMeal({ dietInfo, onBack, onAdd }: { dietInfo: string; onBack: () => void; onAdd: (x: { f: FoodItem; s: number }[], thumb?: string) => void }) {
   const fileRef = useRef<HTMLInputElement>(null)
-  const [preview, setPreview] = useState('')
-  const [photo, setPhoto] = useState<Blob | null>(null)
+  const [shots, setShots] = useState<{ file: File; url: string }[]>([])
   const [hint, setHint] = useState('')
   const [group, setGroup] = useState(false)
   const [people, setPeople] = useState(4)
@@ -228,17 +227,22 @@ function PhotoMeal({ dietInfo, onBack, onAdd }: { dietInfo: string; onBack: () =
   const [share, setShare] = useState<number[]>([]) // 每道菜吃的比例（相對於平均一人份或一份）
   const n = group ? people : 1
 
-  useEffect(() => () => { if (preview) URL.revokeObjectURL(preview) }, [preview])
-  const choose = (file: File) => {
+  const shotsRef = useRef(shots)
+  shotsRef.current = shots
+  useEffect(() => () => shotsRef.current.forEach((x) => URL.revokeObjectURL(x.url)), [])
+  const choose = async (files: File[]) => {
     setErr(''); setRes(null)
-    setPhoto(file)
-    setPreview(URL.createObjectURL(file))
+    const max = await maxImages()
+    const all = [...shots, ...files.map((file) => ({ file, url: URL.createObjectURL(file) }))]
+    if (all.length > max) { all.slice(max).forEach((x) => URL.revokeObjectURL(x.url)); setErr(`一次最多 ${max} 張，已保留前 ${max} 張。`) }
+    setShots(all.slice(0, max))
   }
+  const removeShot = (i: number) => { URL.revokeObjectURL(shots[i].url); setShots(shots.filter((_, j) => j !== i)) }
 
   const run = async () => {
     setBusy(true); setErr('')
     try {
-      const r = await recognizeMeal(photo!, dietInfo, hint, n)
+      const r = await recognizeMeal(shots.map((x) => x.file), dietInfo, hint, n)
       setRes(r); setItems(r.items); setShare(r.items.map(() => 1))
     } catch (e) { setErr(friendlyError(e)) }
     setBusy(false)
@@ -260,11 +264,11 @@ function PhotoMeal({ dietInfo, onBack, onAdd }: { dietInfo: string; onBack: () =
       kcal: Math.round(it.kcal), protein: it.protein, carbs: it.carbs, fat: it.fat
     },
     s: Math.round(servingsOf(i) * 1000) / 1000
-  }] : []), photo ? await makeThumb(photo) : '')
+  }] : []), shots[0] ? await makeThumb(shots[0].file) : '')
 
   return (
     <div className="pick scroll">
-      <input ref={fileRef} type="file" accept="image/*" hidden onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) choose(f) }} />
+      <input ref={fileRef} type="file" accept="image/*" multiple hidden onChange={(e) => { const fs = Array.from(e.target.files ?? []); e.target.value = ''; if (fs.length) choose(fs) }} />
       {!res && (
         <div className="seg" role="group" aria-label="用餐方式">
           <button className={!group ? 'on' : ''} onClick={() => setGroup(false)}><Icon name="user" size={18} />自己吃</button>
@@ -281,27 +285,34 @@ function PhotoMeal({ dietInfo, onBack, onAdd }: { dietInfo: string; onBack: () =
           </div>
         </div>
       )}
-      {!preview ? (
+      {!shots.length ? (
         <div className="center" style={{ padding: '20px 0' }}>
           <p className="muted">
             {group
               ? '開動前把整桌菜拍下來。Claude 會估算每道菜，再由你選每道吃了多少。'
-              : '拍下整份餐點，Claude 會辨識內容並估算熱量。'}
+              : '拍下或從相簿選餐點照片，可以一次選好幾張。Claude 會辨識內容並估算熱量。'}
             <br />第一次使用時，請在跳出的視窗允許這個頁面使用 Claude。
           </p>
           <button className="primary" onClick={() => fileRef.current?.click()}><Icon name="camera" size={18} />拍照或選照片</button>
         </div>
       ) : (
         <>
-          <img src={preview} className="photo" alt="餐點照片" />
+          <div className="shots">
+            {shots.map((x, i) => (
+              <div className="shot" key={x.url}>
+                <img src={x.url} alt={`餐點照片 ${i + 1}`} />
+                {!res && <button className="shot-x" onClick={() => removeShot(i)} aria-label={`移除第 ${i + 1} 張`}><Icon name="close" size={14} /></button>}
+              </div>
+            ))}
+            {!res && <button className="shot add-shot" onClick={() => fileRef.current?.click()} aria-label="再加照片"><Icon name="plus" size={22} /></button>}
+          </div>
           {!res && (
             <>
               <label className="field">補充說明（選填）
                 <input value={hint} onChange={(e) => setHint(e.target.value)} placeholder={group ? '例如：素食餐廳、那鍋湯是昆布湯底' : '例如：飯只吃一半、素食自助餐'} />
               </label>
               <div className="row end">
-                <button className="ghost" onClick={() => fileRef.current?.click()}>換一張</button>
-                <button className="primary" onClick={run} disabled={busy}>{busy ? 'Claude 辨識中，約 10–40 秒…' : '開始辨識'}</button>
+                <button className="primary" onClick={run} disabled={busy}>{busy ? 'Claude 辨識中，約 10–60 秒…' : `辨識 ${shots.length} 張照片`}</button>
               </div>
             </>
           )}
@@ -310,6 +321,7 @@ function PhotoMeal({ dietInfo, onBack, onAdd }: { dietInfo: string; onBack: () =
       {err && <div className="alert">{err}</div>}
       {res && (
         <>
+          {items.length > 0 && <h3 className="confirm-title">請確認辨識結果<small>可以修改名稱、熱量，沒吃的選「沒吃」</small></h3>}
           {group && items.length > 0 && <p className="note" style={{ marginTop: 4 }}>{n} 人分食。「平均」是整道菜的 1/{n}；個人份的菜（例如自己那碗飯）用「一份」計算。</p>}
           {items.length === 0 && <p className="muted">{res.comment || '沒有辨識到食物'}</p>}
           {items.map((it, i) => (
@@ -331,7 +343,6 @@ function PhotoMeal({ dietInfo, onBack, onAdd }: { dietInfo: string; onBack: () =
                     <button key={l.label} className={share[i] === l.k ? 'chip on' : 'chip'} onClick={() => setShare(share.map((v, j) => (j === i ? l.k : v)))}>{l.label}</button>
                   ))}
                 </div>
-                {it.concern && <div className="warn small"><Icon name="alert" size={14} /> {it.concern}</div>}
               </div>
             </div>
           ))}
@@ -339,7 +350,8 @@ function PhotoMeal({ dietInfo, onBack, onAdd }: { dietInfo: string; onBack: () =
           <p className="note">Claude 估算的是大約數值，熱量可以直接修改。</p>
           <div className="row end">
             <button className="ghost" onClick={onBack}>取消</button>
-            <button className="primary" onClick={confirm} disabled={!share.some((v) => v > 0)}>加入 {Math.round(total)} 大卡</button>
+            <button className="ghost" onClick={() => { setRes(null); setItems([]) }}>重新辨識</button>
+            <button className="primary" onClick={confirm} disabled={!share.some((v) => v > 0)}>確認加入 {share.filter((v) => v > 0).length} 項・{Math.round(total)} 大卡</button>
           </div>
         </>
       )}
@@ -378,7 +390,6 @@ function Scanner({ customFoods, dietInfo, onBack, onFound, onForm }: {
       const r = await readNutritionLabel(file, dietInfo)
       const notes = [
         r.vegLabel && `包裝標示：${r.vegLabel}`,
-        r.concern && `注意：${r.concern}`,
         r.servingsPerPackage > 1 && `本包裝共 ${r.servingsPerPackage} 份，加入後可在份數調整。`
       ].filter(Boolean).join('\n')
       onForm({ ...toForm({ ...r, custom: true }), barcode: code || r.barcode || undefined, note: notes || '請對照包裝確認 Claude 讀出的數值。' })

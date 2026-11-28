@@ -45,12 +45,14 @@ const n = (v: unknown) => { const x = Number(v); return isFinite(x) && x >= 0 ? 
 const s = (v: unknown) => (typeof v === 'string' ? v : '')
 
 /** people > 1 為聚餐模式：回傳每道菜「整道」的數值，並標示是否為大家分食的合菜 */
-export async function recognizeMeal(photo: Blob, dietInfo: string, hint: string, people = 1): Promise<MealResult> {
+export async function recognizeMeal(photos: Blob[], dietInfo: string, hint: string, people = 1): Promise<MealResult> {
   const group = people > 1
+  const many = photos.length > 1
   const prompt = [
     group
       ? `你是台灣的營養師助理。附上的照片是 ${people} 個人聚餐的整桌菜，請辨識每一道菜。`
       : '你是台灣的營養師助理。附上的照片是使用者的一餐，請辨識照片裡每一樣食物，估算份量與營養素。',
+    many ? `這次附了 ${photos.length} 張照片：可能是不同的餐點，也可能是同一份餐點的不同角度。同一樣食物在多張照片出現時只算一次，不要重複計算。` : '',
     group
       ? [
           '每道菜請估算「整道菜」（整盤、整鍋）的份量與營養素，不要先除以人數，使用者會自己選吃了多少。',
@@ -59,23 +61,22 @@ export async function recognizeMeal(photo: Blob, dietInfo: string, hint: string,
         ].join('\n')
       : '以台灣常見的食物與份量為準。同一道菜不要拆得太細，例如一個便當可拆成主食、主菜、配菜。shared 一律填 false。',
     '',
-    '使用者的飲食習慣：',
-    dietInfo,
+    '使用者拍的都是自己可以吃的食物，不需要提醒任何飲食禁忌（葷食、五辛、蛋奶等），食物名稱照實際看到的命名即可。',
     hint ? `\n使用者補充：${hint}` : '',
     '',
     '只回覆一個 JSON 物件，格式如下（數值為數字，熱量單位大卡，其他單位公克）：',
     group
-      ? '{"items":[{"name":"麻婆豆腐","portion":"1 盤約 500g","kcal":620,"protein":30,"carbs":20,"fat":46,"shared":true,"concern":""}],"comment":"一兩句整體說明"}'
-      : '{"items":[{"name":"五穀飯","portion":"1 碗約 180g","kcal":250,"protein":6,"carbs":52,"fat":2,"shared":false,"concern":""}],"comment":"一兩句整體說明"}',
-    'concern：若這道菜可能不符合使用者的飲食習慣（含葷、含五辛、含不吃的蛋或奶、可能用葷高湯），用一句話說明原因；沒有問題就填空字串。',
+      ? '{"items":[{"name":"麻婆豆腐","portion":"1 盤約 500g","kcal":620,"protein":30,"carbs":20,"fat":46,"shared":true}],"comment":"一兩句整體說明"}'
+      : '{"items":[{"name":"五穀飯","portion":"1 碗約 180g","kcal":250,"protein":6,"carbs":52,"fat":2,"shared":false}],"comment":"一兩句整體說明"}',
+    'comment 只說明份量估算的不確定處，不要提到飲食禁忌。',
     '如果照片裡沒有食物，items 為空陣列並在 comment 說明。'
   ].join('\n')
-  const r = await (await need()).json<{ items?: unknown[]; comment?: unknown }>(prompt, { images: photo })
+  const r = await (await need()).json<{ items?: unknown[]; comment?: unknown }>(prompt, { images: photos })
   const items = (Array.isArray(r?.items) ? r.items : []).map((x) => {
     const o = (x ?? {}) as Record<string, unknown>
     return {
       name: s(o.name) || '食物', portion: s(o.portion) || '1 份', kcal: n(o.kcal), protein: n(o.protein), carbs: n(o.carbs), fat: n(o.fat),
-      concern: s(o.concern), shared: group && o.shared !== false
+      concern: '', shared: group && o.shared !== false
     }
   })
   return { items, comment: s(r?.comment) }
@@ -85,18 +86,17 @@ export async function readNutritionLabel(photo: Blob, dietInfo: string): Promise
   const prompt = [
     '你是台灣的營養師助理。附上的照片是包裝食品的營養標示或成分表（也可能拍到條碼）。',
     '台灣的營養標示通常有「每份」和「每100公克／毫升」兩欄，請優先讀「每份」；若只有每100公克，unit 填「100 公克」並用該欄數值。',
-    '若照片裡有成分表，依使用者的飲食習慣檢查是否有不適合的成分。',
     '',
     '使用者的飲食習慣：',
     dietInfo,
     '',
     '只回覆一個 JSON 物件，格式如下：',
-    '{"name":"產品名稱","unit":"1 份 (30 公克)","kcal":135,"protein":2.4,"carbs":18,"fat":6,"servingsPerPackage":8,"vegLabel":"包裝上的素食標示，沒有就空字串","concern":"不適合的成分與原因，沒有就空字串","barcode":"照片裡看得到的條碼數字，沒有就空字串"}'
+    '{"name":"產品名稱","unit":"1 份 (30 公克)","kcal":135,"protein":2.4,"carbs":18,"fat":6,"servingsPerPackage":8,"vegLabel":"包裝上的素食標示，沒有就空字串","barcode":"照片裡看得到的條碼數字，沒有就空字串"}'
   ].join('\n')
   const o = (await (await need()).json<Record<string, unknown>>(prompt, { images: photo })) ?? {}
   return {
     name: s(o.name) || '包裝食品', unit: s(o.unit) || '1 份', kcal: n(o.kcal), protein: n(o.protein), carbs: n(o.carbs), fat: n(o.fat),
-    servingsPerPackage: n(o.servingsPerPackage) || 1, vegLabel: s(o.vegLabel), concern: s(o.concern), barcode: s(o.barcode).replace(/\D/g, '')
+    servingsPerPackage: n(o.servingsPerPackage) || 1, vegLabel: s(o.vegLabel), concern: '', barcode: s(o.barcode).replace(/\D/g, '')
   }
 }
 
